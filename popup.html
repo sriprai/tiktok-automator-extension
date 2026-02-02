@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TikTok Video Automator</title>
+    <link rel="stylesheet" href="popup.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <!-- Header -->
+      <div class="header">
+        <div class="logo">
+          <img src="icons/icon48.png" alt="Logo" />
+          <h1>TikTok Automator</h1>
+        </div>
+        <div class="user-info" id="userInfo">
+          <div class="loading">Loading user...</div>
+        </div>
+      </div>
+
+      <!-- Video Type Tabs (Main Navigation) -->
+      <div class="video-type-tabs main-tabs">
+        <button class="video-type-btn active" data-video-type="all">
+          All Videos
+        </button>
+        <button class="video-type-btn" data-video-type="Showcase">
+          Showcase
+        </button>
+        <button class="video-type-btn" data-video-type="video viral">
+          Viral Video
+        </button>
+      </div>
+
+      <!-- Main Content -->
+      <div class="main-content">
+        <div class="tab-header">
+          <h2>My Video Library</h2>
+          <div class="controls">
+            <button id="refreshVideos" class="btn-icon" title="Refresh">
+              <i class="fas fa-sync-alt"></i>
+            </button>
+            <select id="accountFilter" class="filter-select">
+              <option value="all">All Accounts</option>
+              <!-- TikTok accounts will be loaded here -->
+            </select>
+            <div class="status-indicator">
+              <span class="status-badge ready">Ready to Post</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="loading-container" id="videosLoading">
+          <div class="spinner"></div>
+          <p>Loading videos...</p>
+        </div>
+
+        <div class="videos-grid" id="videosGrid">
+          <!-- Videos will be loaded here -->
+        </div>
+
+        <div class="empty-state" id="videosEmpty">
+          <i class="fas fa-video-slash"></i>
+          <p>No videos found</p>
+          <p class="subtext">Create videos in the web app first</p>
+        </div>
+
+        <!-- Upload Status Window -->
+        <div class="upload-status-window" id="uploadStatusWindow">
+          <div class="upload-status-header">
+            <h3><i class="fas fa-check-circle"></i> Extension Ready</h3>
+            <button class="upload-status-close" id="uploadStatusClose">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <div class="upload-status-body">
+            <p>Extension is ready to assist with uploads</p>
+            <div class="upload-status-info">
+              <div class="status-indicator">
+                <span class="status-badge ready" id="uploadStatusBadge"
+                  >Ready</span
+                >
+              </div>
+              <div class="upload-status-url" id="uploadStatusUrl">
+                TikTok upload page detected
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Products Tab -->
+      <div class="tab-content" id="productsTab">
+        <div class="tab-header">
+          <h2>My Products</h2>
+          <div class="controls">
+            <button id="refreshProducts" class="btn-icon" title="Refresh">
+              <i class="fas fa-sync-alt"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="loading-container" id="productsLoading">
+          <div class="spinner"></div>
+          <p>Loading products...</p>
+        </div>
+
+        <div class="table-container">
+          <table class="products-table" id="productsTable">
+            <thead>
+              <tr>
+                <th>Product ID</th>
+                <th>Title</th>
+                <th>Price</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="productsBody">
+              <!-- Products will be loaded here -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="empty-state" id="productsEmpty">
+          <i class="fas fa-box-open"></i>
+          <p>No products found</p>
+          <p class="subtext">Add products in the web app first</p>
+        </div>
+      </div>
+
+      <!-- Accounts Tab -->
+      <div class="tab-content" id="accountsTab">
+        <div class="tab-header">
+          <h2>TikTok Accounts</h2>
+          <div class="controls">
+            <button id="refreshAccounts" class="btn-icon" title="Refresh">
+              <i class="fas fa-sync-alt"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="loading-container" id="accountsLoading">
+          <div class="spinner"></div>
+          <p>Loading accounts...</p>
+        </div>
+
+        <div class="accounts-list" id="accountsList">
+          <!-- Accounts will be loaded here -->
+        </div>
+
+        <div class="empty-state" id="accountsEmpty">
+          <i class="fas fa-user-slash"></i>
+          <p>No TikTok accounts connected</p>
+          <p class="subtext">Connect your TikTok account in the web app</p>
+        </div>
+      </div>
+
+      <!-- Login Section (shown when not logged in) -->
+      <div class="login-container" id="loginContainer">
+        <div class="login-box">
+          <h2>Login Required</h2>
+          <p>Please log in to the TikTok Video Automator web app first.</p>
+          <div class="login-actions">
+            <button id="openWebApp" class="btn-primary">
+              <i class="fas fa-external-link-alt"></i> Open Web App
+            </button>
+            <button id="checkLogin" class="btn-secondary">
+              <i class="fas fa-sync-alt"></i> Check Login Status
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="footer">
+        <div class="credits-info" id="creditsInfo">
+          <i class="fas fa-coins"></i>
+          <span>Loading credits...</span>
+        </div>
+        <div class="version">v1.0.0</div>
+      </div>
+    </div>
+
+    <!-- Video Player Modal -->
+    <div class="video-player-modal" id="videoPlayerModal">
+      <div class="video-player-container">
+        <div class="video-player-header">
+          <h3>Video Preview</h3>
+          <button class="video-player-close" id="videoPlayerClose">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="video-player-wrapper">
+          <div class="video-player">
+            <video id="videoPlayer" controls autoplay>
+              Your browser does not support the video tag.
+            </video>
+          </div>
+        </div>
+        <div class="video-player-info">
+          <div class="video-player-title" id="videoPlayerTitle">
+            Video Title
+          </div>
+          <div class="video-player-meta">
+            <span id="videoPlayerType">Showcase</span>
+            <span class="video-player-status" id="videoPlayerStatus"
+              >Ready to Post</span
+            >
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,54 @@
+{
+  "manifest_version": 3,
+  "name": "TikTok Video Automator",
+  "version": "1.0.0",
+  "description": "Chrome extension for TikTok Video Automator - View videos and products from your library",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "cookies",
+    "tabs",
+    "alarms"
+  ],
+  "host_permissions": [
+    "http://localhost:3000/*",
+    "https://*.tiktok.com/*",
+    "https://automatorx.thairiches.com/*",
+    "https://n8n.srv803794.hstgr.cloud/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "TikTok Video Automator"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.tiktok.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "http://localhost:3000/*",
+        "https://tiktok-automator.vercel.app/*",
+        "https://automatorx.thairiches.com/*"
+      ],
+      "js": ["webapp-content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["injected.js"],
+      "matches": ["https://www.tiktok.com/*"]
+    }
+  ]
+}
