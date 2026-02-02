@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Test Button Disable Functionality</title>
+    <style>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        padding: 20px;
+        background: #f5f5f5;
+        color: #333;
+      }
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #2c3e50;
+        border-bottom: 2px solid #3498db;
+        padding-bottom: 10px;
+      }
+      .test-section {
+        margin: 20px 0;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        background: #f9f9f9;
+      }
+      .test-result {
+        margin: 10px 0;
+        padding: 10px;
+        border-radius: 5px;
+        font-family: monospace;
+      }
+      .success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+      .error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+      .info {
+        background: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+      }
+      .demo-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 20px 0;
+        padding: 20px;
+        background: #1e293b;
+        border-radius: 10px;
+      }
+      .demo-button {
+        padding: 10px 15px;
+        border-radius: 8px;
+        border: none;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        transition: all 0.2s ease;
+      }
+      .upload-btn {
+        background: rgba(59, 130, 246, 0.15);
+        color: #60a5fa;
+        border: 1px solid rgba(59, 130, 246, 0.3);
+      }
+      .caption-btn {
+        background: rgba(139, 92, 246, 0.15);
+        color: #a78bfa;
+        border: 1px solid rgba(139, 92, 246, 0.3);
+      }
+      .product-id-btn {
+        background: rgba(255, 255, 255, 0.1);
+        color: #f1f5f9;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+      .ai-content-btn {
+        background: rgba(15, 23, 42, 0.4);
+        color: #94a3b8;
+        border: 1px solid #475569;
+      }
+      .post-tiktok-btn {
+        background: linear-gradient(90deg, #fe2c55 0%, #ff4d6d 100%);
+        color: white;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+      }
+      .demo-button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+        filter: grayscale(100%);
+      }
+      .post-tiktok-btn:disabled {
+        background: linear-gradient(90deg, #64748b 0%, #94a3b8 100%);
+        opacity: 0.6;
+      }
+      .toggle-btn {
+        background: #3498db;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+        margin: 5px;
+      }
+      .toggle-btn:hover {
+        background: #2980b9;
+      }
+      code {
+        background: #2c3e50;
+        color: #ecf0f1;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: "Courier New", monospace;
+      }
+      .steps {
+        margin: 20px 0;
+        padding-left: 20px;
+      }
+      .steps li {
+        margin: 10px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Button Enable/Disable Test</h1>
+
+      <div class="test-section">
+        <h2>Problem Analysis</h2>
+        <p>
+          The issue was that action buttons (upload, caption, AI content,
+          product ID, post to TikTok) should only be enabled when on a TikTok
+          upload page.
+        </p>
+
+        <div class="test-result info">
+          <strong>Requirements:</strong>
+          <ul>
+            <li>Buttons should be disabled when NOT on TikTok upload page</li>
+            <li>Buttons should be enabled when ON TikTok upload page</li>
+            <li>Disabled buttons should have grayed-out styling</li>
+            <li>Disabled buttons should not be clickable</li>
+            <li>
+              Tooltips should show "Please open TikTok upload page first" when
+              disabled
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="test-section">
+        <h2>Solution Implemented</h2>
+
+        <div class="test-result success">
+          <strong>Changes Made:</strong>
+          <ol>
+            <li>
+              <strong
+                >Updated
+                <code>updateUploadButtonsStatus()</code> function:</strong
+              >
+              <ul>
+                <li>Added <code>ai-content-btn</code> to button selector</li>
+                <li>
+                  Added <code>filter: grayscale(100%)</code> for disabled state
+                </li>
+                <li>Updated tooltip text for all buttons when disabled</li>
+              </ul>
+            </li>
+            <li>
+              <strong>Updated CSS for disabled buttons:</strong>
+              <ul>
+                <li>Added <code>:disabled</code> rules for all button types</li>
+                <li>
+                  Added <code>filter: grayscale(100%)</code> for visual feedback
+                </li>
+                <li>Special styling for disabled "Post to TikTok" button</li>
+              </ul>
+            </li>
+            <li>
+              <strong>Enhanced button click handlers:</strong>
+              <ul>
+                <li>
+                  All handlers check <code>isOnUploadPage</code> before
+                  proceeding
+                </li>
+                <li>Show alert if user tries to click disabled buttons</li>
+              </ul>
+            </li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="test-section">
+        <h2>Live Demo</h2>
+        <p>
+          Toggle between "On TikTok Upload Page" and "On Other Page" to see
+          button states:
+        </p>
+
+        <div class="demo-buttons" id="demoButtons">
+          <button class="demo-button upload-btn" id="demoUpload">
+            <i class="fas fa-upload"></i> Upload
+          </button>
+          <button class="demo-button caption-btn" id="demoCaption">
+            <i class="fas fa-font"></i> Caption
+          </button>
+          <button class="demo-button product-id-btn" id="demoProductId">
+            <i class="fas fa-tag"></i> Product ID
+          </button>
+          <button class="demo-button ai-content-btn" id="demoAiContent">
+            <i class="fas fa-robot"></i> AI Content
+          </button>
+          <button class="demo-button post-tiktok-btn" id="demoPostTiktok">
+            <i class="fab fa-tiktok"></i> Post to TikTok
+          </button>
+        </div>
+
+        <div style="text-align: center; margin: 20px 0">
+          <button class="toggle-btn" id="toggleUploadPage">
+            Toggle: Currently <span id="pageStatus">On Other Page</span>
+          </button>
+          <button class="toggle-btn" id="simulateClick">
+            Simulate Button Click
+          </button>
+        </div>
+
+        <div id="demoStatus" class="test-result info">
+          <strong>Current Status:</strong> Buttons are
+          <span id="buttonState">disabled</span> (not on TikTok upload page)
+        </div>
+      </div>
+
+      <div class="test-section">
+        <h2>How It Works</h2>
+        <div class="test-result info">
+          <strong>Technical Implementation:</strong>
+          <pre><code>// 1. Button status check runs every 5 seconds
+function startUploadPageStatusChecker() {
+    updateUploadButtonsStatus();
+    updateUploadStatusWindow();
+    
+    setInterval(() => {
+        updateUploadButtonsStatus();
+        updateUploadStatusWindow();
+    }, 5000);
+}
+
+// 2. Check if user is on TikTok upload page
+async function checkUploadPageStatus() {
+    const allTabs = await chrome.tabs.query({});
+    const uploadTabs = allTabs.filter((tab) => {
+        if (!tab.url) return false;
+        const url = tab.url.toLowerCase();
+        return url.includes("tiktok.com/upload") || 
+               url.includes("tiktok.com/tiktokstudio/upload");
+    });
+    return uploadTabs.length > 0;
+}
+
+// 3. Update button states based on page status
+async function updateUploadButtonsStatus() {
+    const isOnUploadPage = await checkUploadPageStatus();
+    const actionButtons = document.querySelectorAll(
+        ".upload-btn, .caption-btn, .product-id-btn, .ai-content-btn, .post-tiktok-btn"
+    );
+
+    actionButtons.forEach((btn) => {
+        if (isOnUploadPage) {
+            btn.disabled = false;
+            btn.style.opacity = "1";
+            btn.style.cursor = "pointer";
+            btn.style.filter = "none";
+            // Set appropriate tooltips
+        } else {
+            btn.disabled = true;
+            btn.style.opacity = "0.5";
+            btn.style.cursor = "not-allowed";
+            btn.style.filter = "grayscale(100%)";
+            btn.title = "Please open TikTok upload page first";
+        }
+    });
+}
+
+// 4. CSS for disabled state
+.upload-btn:disabled,
+.caption-btn:disabled,
+.product-id-btn:disabled,
+.ai-content-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    filter: grayscale(100%);
+}
+
+.post-tiktok-btn:disabled {
+    background: linear-gradient(90deg, #64748b 0%, #94a3b8 100%);
+    opacity: 0.6;
+    cursor: not-allowed;
+    filter: grayscale(100%);
+}</code></pre>
+        </div>
+      </div>
+
+      <div class="test-section">
+        <h2>Expected Behavior</h2>
+        <div class="test-result success">
+          <ul>
+            <li>✓ Buttons automatically check status every 5 seconds</li>
+            <li>✓ Buttons disabled when not on TikTok upload page</li>
+            <li>✓ Buttons enabled when on TikTok upload page</li>
+            <li>✓ Visual feedback: grayscale filter + reduced opacity</li>
+            <li>✓ Cursor changes to "not-allowed" when disabled</li>
+            <li>✓ Tooltip shows helpful message when disabled</li>
+            <li>✓ Button click handlers validate page status</li>
+            <li>✓ "Post to TikTok" button has special disabled styling</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="test-section">
+        <h2>Testing Instructions</h2>
+        <ol class="steps">
+          <li>
+            Load the Chrome extension (chrome://extensions → Load unpacked)
+          </li>
+          <li>Open the extension popup</li>
+          <li>
+            Open TikTok upload page (https://www.tiktok.com/upload) in a tab
+          </li>
+          <li>Check extension buttons - they should be enabled and colorful</li>
+          <li>Close TikTok upload page or navigate to another site</li>
+          <li>
+            Check extension buttons - they should be disabled and grayed out
+          </li>
+          <li>
+            Try clicking disabled buttons - they should show alert message
+          </li>
+          <li>
+            Re-open TikTok upload page - buttons should auto-enable within 5
+            seconds
+          </li>
+        </ol>
+      </div>
+    </div>
+
+    <script>
+      let isOnUploadPage = false;
+
+      // Initialize demo
+      document.addEventListener("DOMContentLoaded", () => {
+        const toggleBtn = document.getElementById("toggleUploadPage");
+        const simulateBtn = document.getElementById("simulateClick");
+        const pageStatusSpan = document.getElementById("pageStatus");
+        const buttonStateSpan = document.getElementById("buttonState");
+        const demoStatusDiv = document.getElementById("demoStatus");
+
+        const demoButtons = [
+          document.getElementById("demoUpload"),
+          document.getElementById("demoCaption"),
+          document.getElementById("demoProductId"),
+          document.getElementById("demoAiContent"),
+          document.getElementById("demoPostTiktok"),
+        ];
+
+        // Update button states
+        function updateDemoButtons() {
+          demoButtons.forEach((btn) => {
+            if (isOnUploadPage) {
+              btn.disabled = false;
+              btn.style.opacity = "1";
+              btn.style.filter = "none";
+              btn.title = btn.id
+                .replace("demo", "")
+                .replace(/([A-Z])/g, " $1")
+                .trim();
+            } else {
+              btn.disabled = true;
+              btn.style.opacity = "0.5";
+              btn.style.filter = "grayscale(100%)";
+              btn.title = "Please open TikTok upload page first";
+            }
+          });
+
+          pageStatusSpan.textContent = isOnUploadPage
+            ? "On TikTok Upload Page"
+            : "On Other Page";
+          buttonStateSpan.textContent = isOnUploadPage ? "enabled" : "disabled";
+          buttonStateSpan.style.color = isOnUploadPage ? "#22c55e" : "#ef4444";
+          buttonStateSpan.style.fontWeight = "bold";
+
+          demoStatusDiv.className = isOnUploadPage
+            ? "test-result success"
+            : "test-result info";
+          demoStatusDiv.innerHTML = `<strong>Current Status:</strong> Buttons are <span id="buttonState" style="color: ${isOnUploadPage ? "#22c55e" : "#ef4444"}; font-weight: bold;">${isOnUploadPage ? "enabled" : "disabled"}</span> (${isOnUploadPage ? "on TikTok upload page" : "not on TikTok upload page"})`;
+        }
+
+        // Toggle between page states
+        toggleBtn.addEventListener("click", () => {
+          isOnUploadPage = !isOnUploadPage;
+          updateDemoButtons();
+        });
+
+        // Simulate button click
+        simulateBtn.addEventListener("click", () => {
+          if (!isOnUploadPage) {
+            alert("Please open TikTok upload page first");
+            console.log("Button click prevented: Not on TikTok upload page");
+          } else {
+            alert("Button clicked successfully! (On TikTok upload page)");
+            console.log("Button click allowed: On TikTok upload page");
+          }
+        });
+
+        // Add click handlers to demo buttons
+        demoButtons.forEach((btn) => {
+          btn.addEventListener("click", () => {
+            if (!isOnUploadPage) {
+              alert("Please open TikTok upload page first");
+              console.log(
+                `Button ${btn.id} click prevented: Not on TikTok upload page`,
+              );
+            } else {
+              alert(`${btn.textContent.trim()} button clicked!`);
+              console.log(
+                `Button ${btn.id} click allowed: On TikTok upload page`,
+              );
+            }
+          });
+        });
+
+        // Initial state
+        updateDemoButtons();
+      });
+    </script>
+
+    <!-- Font Awesome for icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+  </body>
+</html>

@@ -888,7 +888,7 @@ async function checkUploadPageStatus() {
 async function updateUploadButtonsStatus() {
   const isOnUploadPage = await checkUploadPageStatus();
   const actionButtons = document.querySelectorAll(
-    ".upload-btn, .caption-btn, .product-id-btn, .post-tiktok-btn",
+    ".upload-btn, .caption-btn, .product-id-btn, .ai-content-btn, .post-tiktok-btn",
   );
 
   actionButtons.forEach((btn) => {
@@ -896,15 +896,18 @@ async function updateUploadButtonsStatus() {
       btn.disabled = false;
       btn.style.opacity = "1";
       btn.style.cursor = "pointer";
+      btn.style.filter = "none";
       if (btn.classList.contains("upload-btn")) btn.title = "Upload to TikTok";
       if (btn.classList.contains("caption-btn")) btn.title = "Fill Caption";
       if (btn.classList.contains("product-id-btn")) btn.title = "Add Product";
+      if (btn.classList.contains("ai-content-btn")) btn.title = "AI Content";
       if (btn.classList.contains("post-tiktok-btn"))
         btn.title = "Post to TikTok";
     } else {
       btn.disabled = true;
       btn.style.opacity = "0.5";
       btn.style.cursor = "not-allowed";
+      btn.style.filter = "grayscale(100%)";
       btn.title = "Please open TikTok upload page first";
     }
   });

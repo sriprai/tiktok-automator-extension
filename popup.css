@@ -528,6 +528,21 @@ body {
   cursor: not-allowed;
 }
 
+.caption-btn:disabled,
+.product-id-btn:disabled,
+.ai-content-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  filter: grayscale(100%);
+}
+
+.post-tiktok-btn:disabled {
+  background: linear-gradient(90deg, #64748b 0%, #94a3b8 100%);
+  opacity: 0.6;
+  cursor: not-allowed;
+  filter: grayscale(100%);
+}
+
 .caption-btn {
   background: rgba(139, 92, 246, 0.15);
   color: #a78bfa;
