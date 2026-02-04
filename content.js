@@ -18,6 +18,17 @@ async function sendSuccessWebhook(taskId, method) {
   const webhookUrl =
     "https://n8n.srv803794.hstgr.cloud/webhook/df76bbf9-ed7e-4f95-a62e-2495fe836c63";
   console.log(`Sending success webhook for task ${taskId} via ${method}...`);
+  console.log(`Webhook URL: ${webhookUrl}`);
+
+  // Log the actual payload being sent
+  const payload = {
+    taskId: taskId,
+    status: "success",
+    timestamp: new Date().toISOString(),
+    url: window.location.href,
+    detectionMethod: method,
+  };
+  console.log("Webhook payload:", JSON.stringify(payload, null, 2));
 
   try {
     chrome.runtime.sendMessage(
@@ -27,17 +38,37 @@ async function sendSuccessWebhook(taskId, method) {
         options: {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            taskId: taskId,
-            status: "success",
-            timestamp: new Date().toISOString(),
-            url: window.location.href,
-            detectionMethod: method,
-          }),
+          body: JSON.stringify(payload),
         },
       },
       (response) => {
+        if (chrome.runtime.lastError) {
+          console.error(
+            "Error sending webhook message to background:",
+            chrome.runtime.lastError,
+          );
+          return;
+        }
+
         console.log("Webhook background response:", response);
+
+        if (response && response.ok) {
+          console.log(
+            `✅ Webhook sent successfully for task ${taskId}! Status: ${response.status}`,
+          );
+          // Log the actual response data
+          if (response.data) {
+            console.log("Webhook response data:", response.data);
+          }
+        } else {
+          console.error(
+            `❌ Webhook failed for task ${taskId}. Status: ${response?.status || "Unknown"}, Error: ${response?.error || "Unknown error"}`,
+          );
+          // Log more details about the failure
+          if (response?.data) {
+            console.error("Webhook error response:", response.data);
+          }
+        }
       },
     );
   } catch (error) {
@@ -76,6 +107,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     message.action === "CLICK_POST" ||
     message.action === "CLICK_POST_BUTTON"
   ) {
+    // Store task ID if provided
+    if (message.data && message.data.taskId) {
+      const taskId = message.data.taskId;
+      window.currentTaskId = taskId;
+      console.log(
+        "Stored Task ID in window for CLICK_POST:",
+        window.currentTaskId,
+      );
+      // Also store in localStorage as backup for redirects
+      localStorage.setItem("tt_automator_last_task_id", taskId);
+    }
     clickPostButton().then(sendResponse);
     return true;
   }
@@ -1462,6 +1504,10 @@ async function checkPostSuccessAndNotify() {
       (successModal.textContent.includes("successful") ||
         successModal.textContent.includes("uploaded"));
 
+    console.log(
+      `Success check - isSuccess: ${isSuccess}, isContentPage: ${isContentPage}, modalSuccess: ${modalSuccess}, time elapsed: ${Date.now() - startTime}ms`,
+    );
+
     if (
       isSuccess ||
       modalSuccess ||
@@ -1472,9 +1518,35 @@ async function checkPostSuccessAndNotify() {
 
       if (isSuccess || modalSuccess || isContentPage) {
         console.log("Post success detected! Sending webhook...");
-        const taskId =
+
+        // Get task ID from multiple possible sources
+        let taskId =
           window.currentTaskId ||
           localStorage.getItem("tt_automator_last_task_id");
+
+        // If no taskId found, try to get it from the URL or page context
+        if (!taskId) {
+          console.warn(
+            "No task ID found in window or localStorage, checking other sources...",
+          );
+
+          // Try to extract from URL parameters
+          const urlParams = new URLSearchParams(window.location.search);
+          taskId = urlParams.get("taskId") || urlParams.get("id");
+
+          // Try to find task ID in page content
+          if (!taskId) {
+            const pageContent = document.body.innerText;
+            const taskIdMatch =
+              pageContent.match(/task[_\s-]?id[:\s]+(\d+)/i) ||
+              pageContent.match(/id[:\s]+(\d+)/i);
+            if (taskIdMatch) {
+              taskId = taskIdMatch[1];
+            }
+          }
+        }
+
+        console.log(`Task ID for webhook: ${taskId}`);
 
         if (taskId) {
           sendSuccessWebhook(
@@ -1483,12 +1555,68 @@ async function checkPostSuccessAndNotify() {
           );
           // Clear task ID to prevent duplicate webhooks
           localStorage.removeItem("tt_automator_last_task_id");
+          if (window.currentTaskId) {
+            delete window.currentTaskId;
+          }
+        } else {
+          console.error(
+            "No task ID found for webhook! Sending error webhook...",
+          );
+          // Send error webhook with diagnostic info
+          sendErrorWebhook("No task ID found when sending success webhook");
         }
       } else {
         console.log("Post success check timed out.");
       }
     }
   }, 2000);
+}
+
+// Function to send error webhook when taskId is not found
+async function sendErrorWebhook(errorMessage) {
+  const webhookUrl =
+    "https://n8n.srv803794.hstgr.cloud/webhook/df76bbf9-ed7e-4f95-a62e-2495fe836c63";
+  console.log(`Sending error webhook: ${errorMessage}`);
+
+  try {
+    chrome.runtime.sendMessage(
+      {
+        action: "FETCH_API",
+        url: webhookUrl,
+        options: {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            error: errorMessage,
+            status: "error",
+            timestamp: new Date().toISOString(),
+            url: window.location.href,
+            diagnostic: {
+              currentTaskId: window.currentTaskId,
+              localStorageTaskId: localStorage.getItem(
+                "tt_automator_last_task_id",
+              ),
+              userAgent: navigator.userAgent,
+              pageTitle: document.title,
+            },
+          }),
+        },
+      },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          console.error(
+            "Error sending error webhook message to background:",
+            chrome.runtime.lastError,
+          );
+          return;
+        }
+
+        console.log("Error webhook background response:", response);
+      },
+    );
+  } catch (error) {
+    console.error("Failed to send error webhook message:", error);
+  }
 }
 
 // Note: Removed the old helper UI from TikTok page

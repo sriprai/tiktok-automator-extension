@@ -1,0 +1,146 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Test Webhook</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+        max-width: 800px;
+        margin: 0 auto;
+      }
+      button {
+        padding: 10px 20px;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        margin: 10px 0;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      #result {
+        margin-top: 20px;
+        padding: 15px;
+        border-radius: 5px;
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        white-space: pre-wrap;
+        font-family: monospace;
+      }
+      .success {
+        color: #28a745;
+      }
+      .error {
+        color: #dc3545;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Test Webhook</h1>
+    <p>
+      This page tests the webhook functionality by simulating a POST request to
+      the webhook URL.
+    </p>
+
+    <div>
+      <button id="testWebhook">Test Webhook</button>
+      <button id="testBackgroundFetch">Test Background Fetch</button>
+    </div>
+
+    <div id="result"></div>
+
+    <script>
+      const webhookUrl =
+        "https://n8n.srv803794.hstgr.cloud/webhook/df76bbf9-ed7e-4f95-a62e-2495fe836c63";
+
+      document
+        .getElementById("testWebhook")
+        .addEventListener("click", async () => {
+          const resultEl = document.getElementById("result");
+          resultEl.textContent = "Testing webhook...";
+          resultEl.className = "";
+
+          try {
+            const response = await fetch(webhookUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                taskId: "test-123",
+                status: "success",
+                timestamp: new Date().toISOString(),
+                url: "https://test.tiktok.com",
+                detectionMethod: "test",
+              }),
+            });
+
+            const data = await response.json();
+            resultEl.textContent = `Status: ${response.status}\nResponse: ${JSON.stringify(data, null, 2)}`;
+            resultEl.className = response.ok ? "success" : "error";
+          } catch (error) {
+            resultEl.textContent = `Error: ${error.message}`;
+            resultEl.className = "error";
+          }
+        });
+
+      document
+        .getElementById("testBackgroundFetch")
+        .addEventListener("click", async () => {
+          const resultEl = document.getElementById("result");
+          resultEl.textContent = "Testing background fetch...";
+          resultEl.className = "";
+
+          try {
+            // Test if chrome.runtime is available
+            if (
+              typeof chrome === "undefined" ||
+              !chrome.runtime ||
+              !chrome.runtime.sendMessage
+            ) {
+              resultEl.textContent =
+                "chrome.runtime API not available in this context";
+              resultEl.className = "error";
+              return;
+            }
+
+            chrome.runtime.sendMessage(
+              {
+                action: "FETCH_API",
+                url: webhookUrl,
+                options: {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    taskId: "test-456",
+                    status: "success",
+                    timestamp: new Date().toISOString(),
+                    url: "https://test.tiktok.com",
+                    detectionMethod: "test",
+                  }),
+                },
+              },
+              (response) => {
+                if (chrome.runtime.lastError) {
+                  resultEl.textContent = `Runtime error: ${chrome.runtime.lastError.message}`;
+                  resultEl.className = "error";
+                } else if (response) {
+                  resultEl.textContent = `Response: ${JSON.stringify(response, null, 2)}`;
+                  resultEl.className = response.ok ? "success" : "error";
+                } else {
+                  resultEl.textContent = "No response received";
+                  resultEl.className = "error";
+                }
+              },
+            );
+          } catch (error) {
+            resultEl.textContent = `Error: ${error.message}`;
+            resultEl.className = "error";
+          }
+        });
+    </script>
+  </body>
+</html>

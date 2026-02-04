@@ -235,10 +235,33 @@ async function handleFetchApi(url, options, sendResponse) {
       fetchOptions.credentials = "omit"; // Default to omit for better CORS compatibility
     }
 
+    // Add timeout to fetch request
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    fetchOptions.signal = controller.signal;
+
     const response = await fetch(url, fetchOptions);
+    clearTimeout(timeoutId);
 
     // Get response data
-    const data = await response.json();
+    let data = null;
+    try {
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        data = await response.text();
+      }
+    } catch (parseError) {
+      console.warn("Could not parse response as JSON:", parseError);
+      data = await response.text();
+    }
+
+    console.log(
+      "Fetch API response status:",
+      response.status,
+      response.statusText,
+    );
 
     sendResponse({
       ok: response.ok,
@@ -249,11 +272,24 @@ async function handleFetchApi(url, options, sendResponse) {
     });
   } catch (error) {
     console.error("Error in handleFetchApi:", error);
+
+    // Provide more detailed error information
+    let errorMessage = error.message;
+    let errorStatus = 0;
+
+    if (error.name === "AbortError") {
+      errorMessage = "Request timeout after 30 seconds";
+      errorStatus = 408;
+    } else if (error.message.includes("Failed to fetch")) {
+      errorMessage = "Network error: Failed to connect to server";
+      errorStatus = 0;
+    }
+
     sendResponse({
       ok: false,
-      status: 0,
-      statusText: error.message,
-      error: error.message,
+      status: errorStatus,
+      statusText: errorMessage,
+      error: errorMessage,
       data: null,
     });
   }

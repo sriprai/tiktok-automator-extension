@@ -424,8 +424,17 @@ function createVideoCard(video) {
                   </button>
                   <span class="tooltip-text">AI Content</span>
                 </div>
-                <button class="action-btn post-tiktok-btn" title="Post to TikTok">
-                    <i class="fab fa-tiktok"></i> Post to TikTok
+                <button class="action-btn post-tiktok-btn" data-video-id="${video.id}" title="Post Now">
+                    <i class="fab fa-tiktok"></i> Post Now
+                    <div class="flex items-center gap-1 bg-black/20 px-2 py-1 rounded-md text-sm ml-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-coins h-4 w-4 text-yellow-500" aria-hidden="true">
+                            <circle cx="8" cy="8" r="6"></circle>
+                            <path d="M18.09 10.37A6 6 0 1 1 10.34 18"></path>
+                            <path d="M7 6h1v4"></path>
+                            <path d="m16.71 13.88.7.71-2.82 2.82"></path>
+                        </svg>
+                        5
+                    </div>
                 </button>
             </div>
         </div>
@@ -901,8 +910,7 @@ async function updateUploadButtonsStatus() {
       if (btn.classList.contains("caption-btn")) btn.title = "Fill Caption";
       if (btn.classList.contains("product-id-btn")) btn.title = "Add Product";
       if (btn.classList.contains("ai-content-btn")) btn.title = "AI Content";
-      if (btn.classList.contains("post-tiktok-btn"))
-        btn.title = "Post to TikTok";
+      if (btn.classList.contains("post-tiktok-btn")) btn.title = "Post Now";
     } else {
       btn.disabled = true;
       btn.style.opacity = "0.5";
@@ -1174,7 +1182,7 @@ async function handleAIContentClick(btn, tooltip) {
 }
 
 async function handlePostTiktokClick(btn) {
-  console.log("Post to TikTok button clicked");
+  console.log("Post Now button clicked");
 
   const isOnUploadPage = await checkUploadPageStatus();
   if (!isOnUploadPage) {
@@ -1199,9 +1207,15 @@ async function handlePostTiktokClick(btn) {
     });
 
     if (uploadTabs.length > 0) {
+      // Get the video ID from the button's data attribute
+      const videoId = btn.dataset.videoId;
+
       chrome.tabs.sendMessage(
         uploadTabs[0].id,
-        { action: "CLICK_POST" },
+        {
+          action: "CLICK_POST",
+          data: { taskId: videoId },
+        },
         (response) => {
           if (response && response.success) {
             btn.innerHTML = '<i class="fas fa-check"></i> Posted!';
