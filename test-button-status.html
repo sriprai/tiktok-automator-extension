@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Test Button Status</title>
+    <style>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        padding: 20px;
+        background: #f5f5f5;
+        color: #333;
+      }
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #2c3e50;
+        border-bottom: 2px solid #3498db;
+        padding-bottom: 10px;
+      }
+      .test-section {
+        margin: 20px 0;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        background: #f9f9f9;
+      }
+      .test-result {
+        margin: 10px 0;
+        padding: 10px;
+        border-radius: 5px;
+        font-family: monospace;
+      }
+      .success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+      .error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+      .info {
+        background: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+      }
+      .button-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 10px;
+        margin: 20px 0;
+      }
+      .button-demo {
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        text-align: center;
+        background: white;
+      }
+      .button-demo.enabled {
+        background: #d4edda;
+        border-color: #c3e6cb;
+      }
+      .button-demo.disabled {
+        background: #f8d7da;
+        border-color: #f5c6cb;
+        opacity: 0.5;
+        filter: grayscale(100%);
+      }
+      .button-demo.upload {
+        background: #d1ecf1;
+        border-color: #bee5eb;
+      }
+      .code-block {
+        background: #2c3e50;
+        color: #ecf0f1;
+        padding: 15px;
+        border-radius: 5px;
+        font-family: "Courier New", monospace;
+        overflow-x: auto;
+        margin: 10px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Button Status Test</h1>
+
+      <div class="test-section">
+        <h2>Current Button Status Logic</h2>
+        <div class="test-result info">
+          <strong>From updateUploadButtonsStatus() function:</strong>
+          <div class="code-block">
+            async function updateUploadButtonsStatus() { const isOnUploadPage =
+            await checkUploadPageStatus(); const actionButtons =
+            document.querySelectorAll( ".caption-btn, .product-id-btn,
+            .ai-content-btn, .post-tiktok-btn", ); actionButtons.forEach((btn)
+            => { if (isOnUploadPage) { btn.disabled = false; btn.style.opacity =
+            "1"; btn.style.cursor = "pointer"; btn.style.filter = "none"; if
+            (btn.classList.contains("caption-btn")) btn.title = "Fill Caption";
+            if (btn.classList.contains("product-id-btn")) btn.title = "Add
+            Product"; if (btn.classList.contains("ai-content-btn")) btn.title =
+            "AI Content"; if (btn.classList.contains("post-tiktok-btn"))
+            btn.title = "Post Now"; } else { btn.disabled = true;
+            btn.style.opacity = "0.5"; btn.style.cursor = "not-allowed";
+            btn.style.filter = "grayscale(100%)"; btn.title = "Please open
+            TikTok upload page first"; } }); // Update upload buttons separately
+            - they should always be enabled const uploadButtons =
+            document.querySelectorAll(".upload-btn");
+            uploadButtons.forEach((btn) => { btn.disabled = false;
+            btn.style.opacity = "1"; btn.style.cursor = "pointer";
+            btn.style.filter = "none"; if (isOnUploadPage) { btn.title = "Upload
+            to TikTok"; } else { btn.title = "Open TikTok upload page and upload
+            video"; } }); }
+          </div>
+        </div>
+      </div>
+
+      <div class="test-section">
+        <h2>Expected Behavior</h2>
+        <div class="button-grid">
+          <div class="button-demo upload enabled">
+            <strong>Upload Button</strong><br />
+            <small>Always enabled</small>
+          </div>
+          <div class="button-demo disabled">
+            <strong>Caption Button</strong><br />
+            <small>Disabled when not on upload page</small>
+          </div>
+          <div class="button-demo disabled">
+            <strong>Product ID Button</strong><br />
+            <small>Disabled when not on upload page</small>
+          </div>
+          <div class="button-demo disabled">
+            <strong>AI Content Button</strong><br />
+            <small>Disabled when not on upload page</small>
+          </div>
+          <div class="button-demo disabled">
+            <strong>Post Now Button</strong><br />
+            <small>Disabled when not on upload page</small>
+          </div>
+        </div>
+        <div class="test-result info">
+          <strong>When NOT on TikTok upload page:</strong>
+          <ul>
+            <li>
+              <strong>Upload button:</strong> Always enabled (opens upload page)
+            </li>
+            <li><strong>Caption button:</strong> Disabled (grayed out)</li>
+            <li><strong>Product ID button:</strong> Disabled (grayed out)</li>
+            <li><strong>AI Content button:</strong> Disabled (grayed out)</li>
+            <li><strong>Post Now button:</strong> Disabled (grayed out)</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="test-section">
+        <h2>Debugging Steps</h2>
+        <div class="test-result info">
+          <ol>
+            <li>Open Chrome Developer Tools (F12)</li>
+            <li>Go to Console tab</li>
+            <li>Check for errors when clicking upload button</li>
+            <li>
+              Check if <code>updateUploadButtonsStatus()</code> is being called
+            </li>
+            <li>
+              Check if <code>checkUploadPageStatus()</code> returns correct
+              value
+            </li>
+            <li>Verify that buttons have correct CSS classes</li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="test-section">
+        <h2>Common Issues</h2>
+        <div class="test-result error">
+          <strong>Possible issues:</strong>
+          <ol>
+            <li>
+              <strong>Buttons not found:</strong> The selector might not match
+              button classes
+            </li>
+            <li>
+              <strong>Function not called:</strong>
+              <code>startUploadPageStatusChecker()</code> might not be running
+            </li>
+            <li>
+              <strong>Async timing:</strong> Function might be called before DOM
+              is ready
+            </li>
+            <li>
+              <strong>CSS not applied:</strong> Other CSS might override the
+              styles
+            </li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="test-section">
+        <h2>Quick Fix Test</h2>
+        <div class="test-result info">
+          <p>Try adding this to the browser console when popup is open:</p>
+          <div class="code-block">
+            // Manually check upload page status chrome.tabs.query({},
+            function(allTabs) { const uploadTabs = allTabs.filter((tab) => { if
+            (!tab.url) return false; const url = tab.url.toLowerCase(); const
+            isRegularUpload = url.includes("tiktok.com/upload"); const
+            isStudioUpload = url.includes("tiktok.com/tiktokstudio/upload");
+            return isRegularUpload || isStudioUpload; }); console.log("Is on
+            upload page:", uploadTabs.length > 0); console.log("Found tabs:",
+            uploadTabs); }); // Manually update button status const
+            isOnUploadPage = false; // Set based on above check const
+            actionButtons = document.querySelectorAll(".caption-btn,
+            .product-id-btn, .ai-content-btn, .post-tiktok-btn");
+            actionButtons.forEach((btn) => { btn.disabled = !isOnUploadPage;
+            btn.style.opacity = isOnUploadPage ? "1" : "0.5"; btn.style.cursor =
+            isOnUploadPage ? "pointer" : "not-allowed"; btn.style.filter =
+            isOnUploadPage ? "none" : "grayscale(100%)"; });
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

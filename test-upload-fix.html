@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Test Upload Fix</title>
+    <style>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        padding: 20px;
+        background: #f5f5f5;
+        color: #333;
+      }
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #2c3e50;
+        border-bottom: 2px solid #3498db;
+        padding-bottom: 10px;
+      }
+      .test-section {
+        margin: 20px 0;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        background: #f9f9f9;
+      }
+      .test-result {
+        margin: 10px 0;
+        padding: 10px;
+        border-radius: 5px;
+        font-family: monospace;
+      }
+      .success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+      .error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+      .info {
+        background: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+      }
+      .code-block {
+        background: #2c3e50;
+        color: #ecf0f1;
+        padding: 15px;
+        border-radius: 5px;
+        font-family: "Courier New", monospace;
+        overflow-x: auto;
+        margin: 10px 0;
+      }
+      .steps {
+        margin: 20px 0;
+        padding-left: 20px;
+      }
+      .steps li {
+        margin: 10px 0;
+        padding: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Upload Fix Test</h1>
+
+      <div class="test-section">
+        <h2>Problem</h2>
+        <div class="test-result error">
+          <strong>Issue:</strong> When user clicks upload button and they are
+          NOT on TikTok upload page, the extension opens
+          "https://www.tiktok.com/tiktokstudio/upload" but does NOT
+          automatically upload the video. User needs to click again.
+        </div>
+      </div>
+
+      <div class="test-section">
+        <h2>Solution Implemented</h2>
+        <div class="test-result success">
+          <strong>Fixed in popup.js:</strong>
+          <ol class="steps">
+            <li>
+              <strong
+                >Enhanced <code>handleUploadClick()</code> function:</strong
+              >
+              <ul>
+                <li>
+                  Added <code>waitForContentScriptReady()</code> function that
+                  checks if content script is loaded before sending upload
+                  message
+                </li>
+                <li>
+                  Added <code>sendUploadMessageWithRetry()</code> function with
+                  exponential backoff retry logic (up to 3 retries)
+                </li>
+                <li>
+                  Added PING message handling to verify content script is ready
+                </li>
+              </ul>
+            </li>
+            <li>
+              <strong>Updated content.js:</strong>
+              <ul>
+                <li>
+                  Added handler for <code>PING</code> action to respond when
+                  content script is ready
+                </li>
+              </ul>
+            </li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="test-section">
+        <h2>Key Code Changes</h2>
+        <div class="code-block">
+          // New function in popup.js function waitForContentScriptReady(tabId)
+          { return new Promise((resolve) => { const maxAttempts = 10; let
+          attempts = 0; const checkContentScript = () => { attempts++;
+          console.log(`Checking if content script is ready (attempt
+          ${attempts}/${maxAttempts})...`); chrome.tabs.sendMessage(tabId, {
+          action: "PING" }, (response) => { if (chrome.runtime.lastError) { if
+          (attempts >= maxAttempts) { console.log("Content script not ready
+          after max attempts, proceeding anyway..."); resolve(); return; } //
+          Content script not ready yet, wait and retry
+          setTimeout(checkContentScript, 1000); } else { console.log("Content
+          script is ready!"); resolve(); } }); }; // Start checking after a
+          short delay setTimeout(checkContentScript, 2000); }); } // New
+          function in popup.js async function sendUploadMessageWithRetry(tabId,
+          video) { const maxRetries = 3; let retryCount = 0; const sendMessage =
+          () => { return new Promise((resolve, reject) => {
+          chrome.tabs.sendMessage( tabId, { action: "UPLOAD_VIDEO", data: {
+          taskId: video.id, videoUrl: video.complete_video || video.video_url,
+          caption: video.tone || `${video.title} - ${video.price}`, }, },
+          (response) => { if (chrome.runtime.lastError) { const error =
+          chrome.runtime.lastError; console.error("Error sending message:",
+          error); // Check if content script is not ready if
+          (error.message.includes("Receiving end does not exist")) { reject(new
+          Error("Content script not ready")); } else { reject(error); } } else
+          if (response && !response.success) { console.error("Upload failed:",
+          response.error); reject(new Error(response.error)); } else {
+          console.log("Video upload started successfully."); resolve(response);
+          } } ); }); }; // Try to send the message with retries while
+          (retryCount < maxRetries) { try { await sendMessage(); return; //
+          Success } catch (error) { retryCount++; console.log(`Upload attempt
+          ${retryCount} failed:`, error.message); if (retryCount >= maxRetries)
+          { console.error("Max retries reached, upload failed."); alert(`Failed
+          to upload video after ${maxRetries} attempts. Please try again.`);
+          return; } // Wait before retrying const waitTime = retryCount * 2000;
+          // Exponential backoff: 2s, 4s, 6s console.log(`Waiting ${waitTime}ms
+          before retry ${retryCount + 1}...`); await new Promise(resolve =>
+          setTimeout(resolve, waitTime)); } } }
+        </div>
+      </div>
+
+      <div class="test-section">
+        <h2>Expected Behavior</h2>
+        <div class="test-result info">
+          <strong>When user clicks upload button:</strong>
+          <ol class="steps">
+            <li>
+              <strong>If user is already on TikTok upload page:</strong>
+              <ul>
+                <li>Extension finds the existing tab</li>
+                <li>Sends UPLOAD_VIDEO message immediately</li>
+                <li>Video upload starts automatically</li>
+              </ul>
+            </li>
+            <li>
+              <strong>If user is NOT on TikTok upload page:</strong>
+              <ul>
+                <li>
+                  Extension opens "https://www.tiktok.com/tiktokstudio/upload"
+                  in new tab
+                </li>
+                <li>Waits 2 seconds for page to load</li>
+                <li>Checks if content script is ready (sends PING message)</li>
+                <li>If content script responds, sends UPLOAD_VIDEO message</li>
+                <li>
+                  If content script doesn't respond, waits and retries up to 10
+                  times
+                </li>
+                <li>
+                  Once content script is ready, sends upload message with retry
+                  logic
+                </li>
+                <li>Video upload starts automatically</li>
+              </ul>
+            </li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="test-section">
+        <h2>Testing Instructions</h2>
+        <div class="test-result info">
+          <ol class="steps">
+            <li>Load the Chrome extension</li>
+            <li>Make sure you are NOT on TikTok upload page</li>
+            <li>Click the upload button on any video</li>
+            <li>
+              Extension should automatically:
+              <ul>
+                <li>Open TikTok Studio upload page</li>
+                <li>Wait for page to load</li>
+                <li>Automatically upload the video</li>
+                <li>Show upload progress</li>
+              </ul>
+            </li>
+            <li>Check browser console for logs to verify the process</li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="test-section">
+        <h2>Files Modified</h2>
+        <div class="test-result success">
+          <ul>
+            <li>
+              <strong>popup.js</strong> - Updated handleUploadClick() with
+              robust retry logic
+            </li>
+            <li><strong>content.js</strong> - Added PING message handler</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

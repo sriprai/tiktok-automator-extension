@@ -8,7 +8,8 @@ if (window.location.href.includes("/tiktokstudio/content")) {
   const lastTaskId = localStorage.getItem("tt_automator_last_task_id");
   if (lastTaskId) {
     console.log("Detected redirect to content page for task:", lastTaskId);
-    sendSuccessWebhook(lastTaskId, "redirect_on_load");
+    // Note: Webhook is now sent from popup.js, not from content script
+    // sendSuccessWebhook(lastTaskId, "redirect_on_load");
     // Clear it so we don't send multiple times
     localStorage.removeItem("tt_automator_last_task_id");
   }
@@ -1461,8 +1462,8 @@ async function clickPostButton() {
       }
     }
 
-    // 5. ตรวจสอบความสำเร็จและส่ง Webhook
-    checkPostSuccessAndNotify();
+    // 5. Note: Webhook is now sent from popup.js, not from content script
+    // checkPostSuccessAndNotify();
 
     return { success: true, message: "คลิกปุ่ม Post เรียบร้อยแล้ว!" };
   } catch (error) {

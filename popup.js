@@ -82,10 +82,42 @@ function setupEventListeners() {
   });
 
   document.getElementById("checkLogin").addEventListener("click", async () => {
-    await checkAuth();
-    if (currentUser) {
-      await loadAllData();
+    // Show loading state
+    const checkLoginBtn = document.getElementById("checkLogin");
+    const originalHTML = checkLoginBtn.innerHTML;
+    checkLoginBtn.innerHTML =
+      '<i class="fas fa-spinner fa-spin"></i> Checking...';
+    checkLoginBtn.disabled = true;
+
+    try {
+      // Clear cached user data to force fresh login check
+      await clearUserStorage();
+
+      // Try to check auth with force refresh
+      const isAuthenticated = await checkAuth(true); // Force fresh check
+
+      if (isAuthenticated && currentUser) {
+        await loadAllData();
+        console.log("Login check successful for user:", currentUser.email);
+      } else {
+        console.log("No user logged in or authentication failed");
+        // Show login container if not already shown
+        showLoginContainer();
+      }
+    } catch (error) {
+      console.error("Error during login check:", error);
+      // Show login container on error
+      showLoginContainer();
+    } finally {
+      // Restore button state
+      checkLoginBtn.innerHTML = originalHTML;
+      checkLoginBtn.disabled = false;
     }
+  });
+
+  // Logout button
+  document.getElementById("logoutBtn").addEventListener("click", async () => {
+    await logout();
   });
 
   // Video player close button
@@ -129,16 +161,22 @@ function switchVideoType(videoType) {
 }
 
 // Authentication
-async function checkAuth() {
+async function checkAuth(forceRefresh = false) {
   try {
-    // Try to get user from storage first
-    const storedUser = await getFromStorage(STORAGE_KEYS.USER);
+    // If force refresh is requested, clear storage first
+    if (forceRefresh) {
+      await clearUserStorage();
+    }
 
-    if (storedUser) {
-      currentUser = storedUser;
-      updateUserUI();
-      hideLoginContainer();
-      return true;
+    // Try to get user from storage first (unless force refresh)
+    if (!forceRefresh) {
+      const storedUser = await getFromStorage(STORAGE_KEYS.USER);
+      if (storedUser) {
+        currentUser = storedUser;
+        updateUserUI();
+        hideLoginContainer();
+        return true;
+      }
     }
 
     // Try to get user ID from web app via message
@@ -191,25 +229,47 @@ async function checkAuth() {
 function updateUserUI() {
   if (!currentUser) return;
 
+  // Get user display name - try multiple possible fields
+  const userName =
+    currentUser.name ||
+    currentUser.username ||
+    currentUser.full_name ||
+    currentUser.display_name ||
+    "User";
+  const userEmail =
+    currentUser.email || currentUser.email_address || "No email";
+
+  // Get first character for avatar
+  const avatarChar = userName.charAt(0).toUpperCase();
+
   // Update user info
   userInfoEl.innerHTML = `
         <div class="logged-in">
-            <div class="avatar">${currentUser.name?.charAt(0)?.toUpperCase() || "U"}</div>
-            <div class="email">${currentUser.email}</div>
+            <div class="avatar">${avatarChar}</div>
+            <div class="email">${userEmail}</div>
         </div>
     `;
 
   // Update credits
+  const userCredits = currentUser.credits || currentUser.credit_balance || 0;
   creditsInfoEl.innerHTML = `
         <i class="fas fa-coins"></i>
-        <span>${currentUser.credits || 0} credits</span>
+        <span>${userCredits} credits</span>
     `;
+
+  // Show logout button
+  document.getElementById("logoutBtn").style.display = "flex";
+
+  console.log("User UI updated:", { userName, userEmail, userCredits });
 }
 
 function showLoginContainer() {
   loginContainerEl.style.display = "flex";
   document.querySelector(".main-content").style.display = "none";
   document.querySelector(".video-type-tabs.main-tabs").style.display = "none";
+
+  // Hide logout button when showing login container
+  document.getElementById("logoutBtn").style.display = "none";
 }
 
 function hideLoginContainer() {
@@ -433,6 +493,18 @@ function createVideoCard(video) {
                             <path d="M7 6h1v4"></path>
                             <path d="m16.71 13.88.7.71-2.82 2.82"></path>
                         </svg>
+                        0
+                    </div>
+                </button>
+                <button class="action-btn auto-post-btn" data-video-id="${video.id}" data-video-url="${videoUrl || ""}" data-caption="${caption}" data-product-id="${video.product_id || ""}" title="Auto Post">
+                    <i class="fas fa-bolt"></i> Auto Post
+                    <div class="flex items-center gap-1 bg-black/20 px-2 py-1 rounded-md text-sm ml-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-coins h-4 w-4 text-yellow-500" aria-hidden="true">
+                            <circle cx="8" cy="8" r="6"></circle>
+                            <path d="M18.09 10.37A6 6 0 1 1 10.34 18"></path>
+                            <path d="M7 6h1v4"></path>
+                            <path d="m16.71 13.88.7.71-2.82 2.82"></path>
+                        </svg>
                         5
                     </div>
                 </button>
@@ -467,6 +539,7 @@ function createVideoCard(video) {
   const productIdBtn = card.querySelector(".product-id-btn");
   const aiContentBtn = card.querySelector(".ai-content-btn");
   const postTiktokBtn = card.querySelector(".post-tiktok-btn");
+  const autoPostBtn = card.querySelector(".auto-post-btn");
 
   // Tooltip elements
   const uploadTooltip =
@@ -510,6 +583,13 @@ function createVideoCard(video) {
     postTiktokBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       handlePostTiktokClick(postTiktokBtn);
+    });
+  }
+
+  if (autoPostBtn) {
+    autoPostBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      handleAutoPostClick(video, autoPostBtn);
     });
   }
 
@@ -794,6 +874,76 @@ async function getFromStorage(key) {
   });
 }
 
+async function clearUserStorage() {
+  return new Promise((resolve) => {
+    chrome.storage.local.remove([STORAGE_KEYS.USER], () => {
+      currentUser = null;
+      videos = [];
+      products = [];
+      accounts = [];
+      resolve();
+    });
+  });
+}
+
+// Logout function
+async function logout() {
+  // Show loading state in user info
+  userInfoEl.innerHTML = '<div class="loading">Logging out...</div>';
+
+  // Clear user storage
+  await clearUserStorage();
+
+  // Clear UI
+  userInfoEl.innerHTML = '<div class="loading">Loading user...</div>';
+  creditsInfoEl.innerHTML =
+    '<i class="fas fa-coins"></i><span>0 credits</span>';
+
+  // Hide logout button
+  document.getElementById("logoutBtn").style.display = "none";
+
+  // Show login container
+  showLoginContainer();
+
+  // Clear videos grid
+  videosGridEl.innerHTML = "";
+  videosEmptyEl.style.display = "flex";
+  videosEmptyEl.querySelector("p").textContent = "Please log in to view videos";
+
+  // Clear products table
+  productsBodyEl.innerHTML = "";
+  productsEmptyEl.style.display = "flex";
+  productsEmptyEl.querySelector("p").textContent =
+    "Please log in to view products";
+
+  // Clear accounts list
+  accountsListEl.innerHTML = "";
+  accountsEmptyEl.style.display = "flex";
+  accountsEmptyEl.querySelector("p").textContent =
+    "Please log in to view accounts";
+
+  // Clear account filter
+  if (accountFilterEl) {
+    accountFilterEl.innerHTML = '<option value="all">All Accounts</option>';
+  }
+
+  // Reset video type filter to default
+  videoTypeFilter = "all";
+
+  // Update video type tabs UI
+  document.querySelectorAll(".video-type-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.videoType === "all");
+  });
+
+  console.log("User logged out successfully");
+
+  // After logout, try to check auth again to see if user is still logged in web app
+  // This allows users to switch accounts without closing the web app
+  setTimeout(async () => {
+    await checkAuth();
+  }, 1000);
+}
+
 // API helpers
 async function fetchWithAuth(url, options = {}) {
   try {
@@ -840,6 +990,46 @@ async function fetchWithAuth(url, options = {}) {
   } catch (error) {
     console.error("Error in fetchWithAuth:", error);
     throw error;
+  }
+}
+
+// Webhook tracking
+async function sendWebhookEvent(eventType, videoId, buttonType) {
+  try {
+    if (!currentUser || !currentUser.id) {
+      console.warn("Cannot send webhook: No user logged in");
+      return;
+    }
+
+    const webhookData = {
+      event_type: eventType,
+      user_id: currentUser.id,
+      video_id: videoId,
+      button_type: buttonType,
+      timestamp: new Date().toISOString(),
+      credits_used: buttonType === "auto_post" ? 5 : 0, // Auto Post uses 5 credits, Post Now uses 0
+    };
+
+    console.log(`Sending webhook for ${buttonType}:`, webhookData);
+
+    // Send webhook via background script
+    chrome.runtime.sendMessage(
+      {
+        action: "SEND_WEBHOOK",
+        data: webhookData,
+      },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          console.error("Error sending webhook:", chrome.runtime.lastError);
+        } else if (response && response.success) {
+          console.log("Webhook sent successfully");
+        } else {
+          console.warn("Webhook failed:", response?.error);
+        }
+      },
+    );
+  } catch (error) {
+    console.error("Error in sendWebhookEvent:", error);
   }
 }
 
@@ -897,7 +1087,7 @@ async function checkUploadPageStatus() {
 async function updateUploadButtonsStatus() {
   const isOnUploadPage = await checkUploadPageStatus();
   const actionButtons = document.querySelectorAll(
-    ".upload-btn, .caption-btn, .product-id-btn, .ai-content-btn, .post-tiktok-btn",
+    ".upload-btn, .caption-btn, .product-id-btn, .ai-content-btn, .post-tiktok-btn, .auto-post-btn",
   );
 
   actionButtons.forEach((btn) => {
@@ -911,6 +1101,7 @@ async function updateUploadButtonsStatus() {
       if (btn.classList.contains("product-id-btn")) btn.title = "Add Product";
       if (btn.classList.contains("ai-content-btn")) btn.title = "AI Content";
       if (btn.classList.contains("post-tiktok-btn")) btn.title = "Post Now";
+      if (btn.classList.contains("auto-post-btn")) btn.title = "Auto Post";
     } else {
       btn.disabled = true;
       btn.style.opacity = "0.5";
@@ -1218,6 +1409,9 @@ async function handlePostTiktokClick(btn) {
         },
         (response) => {
           if (response && response.success) {
+            // Send webhook after post is successful
+            sendWebhookEvent("post_success", videoId, "post_now");
+
             btn.innerHTML = '<i class="fas fa-check"></i> Posted!';
             btn.style.background = "rgba(34, 197, 94, 0.2)";
             btn.style.color = "#22c55e";
@@ -1240,6 +1434,224 @@ async function handlePostTiktokClick(btn) {
   } catch (error) {
     console.error("Error clicking post button:", error);
     btn.innerHTML = originalHTML;
+  }
+}
+
+async function handleAutoPostClick(video, btn) {
+  console.log("Auto Post button clicked for video:", video.id);
+
+  const isOnUploadPage = await checkUploadPageStatus();
+  if (!isOnUploadPage) {
+    alert("Please open TikTok upload page first");
+    console.log("User not on TikTok upload page. Auto Post aborted.");
+    return;
+  }
+
+  const originalHTML = btn.innerHTML;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Auto Posting...';
+  btn.disabled = true;
+
+  try {
+    // Get the first TikTok upload tab
+    const allTabs = await chrome.tabs.query({});
+    const uploadTabs = allTabs.filter((tab) => {
+      if (!tab.url) return false;
+      const url = tab.url.toLowerCase();
+      return (
+        url.includes("tiktok.com/upload") ||
+        url.includes("tiktok.com/tiktokstudio/upload")
+      );
+    });
+
+    if (uploadTabs.length === 0) {
+      console.log("No TikTok upload page found.");
+      btn.innerHTML = originalHTML;
+      btn.disabled = false;
+      return;
+    }
+
+    const uploadTab = uploadTabs[0];
+    const caption = video.tone || `${video.title} - ${video.price}`;
+    const hasProductId =
+      video.product_id &&
+      video.product_id.trim() !== "" &&
+      video.product_id !== "manual" &&
+      video.product_id !== "none";
+
+    // Helper function to send message with retry logic
+    async function sendMessageWithRetry(action, data, maxRetries = 3) {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`Attempt ${attempt} to send ${action} message...`);
+
+          const response = await new Promise((resolve, reject) => {
+            chrome.tabs.sendMessage(
+              uploadTab.id,
+              { action, data },
+              (response) => {
+                if (chrome.runtime.lastError) {
+                  reject(new Error(chrome.runtime.lastError.message));
+                } else {
+                  resolve(response);
+                }
+              },
+            );
+          });
+
+          console.log(
+            `${action} message sent successfully on attempt ${attempt}`,
+          );
+          return response;
+        } catch (error) {
+          console.warn(
+            `Attempt ${attempt} failed for ${action}:`,
+            error.message,
+          );
+
+          if (attempt < maxRetries) {
+            // Wait before retrying
+            await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+
+            // Try to inject content script if it's not loaded
+            if (error.message.includes("Receiving end does not exist")) {
+              console.log("Attempting to inject content script...");
+              try {
+                await chrome.scripting.executeScript({
+                  target: { tabId: uploadTab.id },
+                  files: ["content.js"],
+                });
+                console.log("Content script injected successfully");
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+              } catch (injectError) {
+                console.warn(
+                  "Failed to inject content script:",
+                  injectError.message,
+                );
+              }
+            }
+          } else {
+            throw error;
+          }
+        }
+      }
+    }
+
+    // Step 1: Upload video
+    console.log("Step 1: Uploading video...");
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+
+    const uploadResult = await sendMessageWithRetry("UPLOAD_VIDEO", {
+      taskId: video.id,
+      videoUrl: video.complete_video || video.video_url,
+      caption: caption,
+    });
+
+    if (!uploadResult || !uploadResult.success) {
+      console.error("Upload failed:", uploadResult?.error);
+      btn.innerHTML = '<i class="fas fa-times"></i> Upload Failed';
+      btn.style.color = "#ef4444";
+      setTimeout(() => {
+        btn.innerHTML = originalHTML;
+        btn.style.color = "";
+        btn.disabled = false;
+      }, 2000);
+      return;
+    }
+
+    // Wait for video processing
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    // Step 2: Set caption
+    console.log("Step 2: Setting caption...");
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Setting caption...';
+
+    const captionResult = await sendMessageWithRetry("SET_CAPTION", {
+      caption: caption,
+    });
+
+    if (!captionResult || !captionResult.success) {
+      console.warn("Caption setting failed:", captionResult?.error);
+      // Continue anyway - caption might already be set from upload
+    }
+
+    // Wait a bit
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    // Step 3: Add product ID if available
+    if (hasProductId) {
+      console.log("Step 3: Adding product ID...");
+      btn.innerHTML =
+        '<i class="fas fa-spinner fa-spin"></i> Adding product...';
+
+      const productResult = await sendMessageWithRetry("ADD_PRODUCT", {
+        productId: video.product_id,
+      });
+
+      if (!productResult || !productResult.success) {
+        console.warn("Product addition failed:", productResult?.error);
+        // Continue anyway - product might not be required
+      }
+
+      // Wait a bit
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+
+    // Step 4: Enable AI content
+    console.log("Step 4: Enabling AI content...");
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enabling AI...';
+
+    const aiResult = await sendMessageWithRetry("TOGGLE_AI_CONTENT", {});
+
+    if (!aiResult || !aiResult.success) {
+      console.warn("AI content enabling failed:", aiResult?.error);
+      // Continue anyway - AI might already be enabled or not available
+    }
+
+    // Wait a bit
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    // Step 5: Click Post button
+    console.log("Step 5: Clicking Post button...");
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Posting...';
+
+    const postResult = await sendMessageWithRetry("CLICK_POST", {
+      taskId: video.id,
+    });
+
+    if (postResult && postResult.success) {
+      console.log("Auto Post completed successfully!");
+
+      // Send webhook after post is successful
+      sendWebhookEvent("post_success", video.id, "auto_post");
+
+      btn.innerHTML = '<i class="fas fa-check"></i> Auto Posted!';
+      btn.style.background = "rgba(34, 197, 94, 0.2)";
+      btn.style.color = "#22c55e";
+      setTimeout(() => {
+        btn.innerHTML = originalHTML;
+        btn.style.background = "";
+        btn.style.color = "";
+        btn.disabled = false;
+      }, 3000);
+    } else {
+      console.error("Post failed:", postResult?.error);
+      btn.innerHTML = '<i class="fas fa-times"></i> Post Failed';
+      btn.style.color = "#ef4444";
+      setTimeout(() => {
+        btn.innerHTML = originalHTML;
+        btn.style.color = "";
+        btn.disabled = false;
+      }, 2000);
+    }
+  } catch (error) {
+    console.error("Error in handleAutoPostClick:", error);
+    btn.innerHTML = '<i class="fas fa-times"></i> Error';
+    btn.style.color = "#ef4444";
+    setTimeout(() => {
+      btn.innerHTML = originalHTML;
+      btn.style.color = "";
+      btn.disabled = false;
+    }, 2000);
   }
 }
 
@@ -1391,6 +1803,7 @@ function startCreditsSync() {
   }, SYNC_INTERVAL);
 
   async function syncCredits() {
+    // Double-check currentUser is not null before proceeding
     if (!currentUser) {
       console.debug("Credits sync skipped: No current user");
       return;
@@ -1415,21 +1828,25 @@ function startCreditsSync() {
 
           // Check if credits have changed
           const newCredits = data.user.credits || 0;
-          const currentCredits = currentUser.credits || 0;
+          const currentCredits = currentUser?.credits || 0; // Safe access with optional chaining
 
           if (newCredits !== currentCredits) {
             console.log(`Credits updated: ${currentCredits} -> ${newCredits}`);
-            currentUser.credits = newCredits;
 
-            // Also update other user fields that might have changed
-            currentUser.email = data.user.email || currentUser.email;
-            currentUser.name = data.user.name || currentUser.name;
+            // Ensure currentUser exists before updating
+            if (currentUser) {
+              currentUser.credits = newCredits;
 
-            await saveToStorage(STORAGE_KEYS.USER, currentUser);
-            updateUserUI();
+              // Also update other user fields that might have changed
+              currentUser.email = data.user.email || currentUser.email;
+              currentUser.name = data.user.name || currentUser.name;
 
-            // Show a subtle notification in the footer
-            showCreditUpdateNotification(newCredits);
+              await saveToStorage(STORAGE_KEYS.USER, currentUser);
+              updateUserUI();
+
+              // Show a subtle notification in the footer
+              showCreditUpdateNotification(newCredits);
+            }
           } else {
             console.debug("Credits unchanged:", newCredits);
           }

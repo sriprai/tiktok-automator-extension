@@ -74,6 +74,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // Keep message channel open for async response
   }
 
+  // Handle webhook requests from popup
+  if (message.action === "SEND_WEBHOOK") {
+    handleSendWebhook(message.data, sendResponse);
+    return true; // Keep message channel open for async response
+  }
+
   // Default response for unknown actions
   sendResponse({
     success: false,
@@ -291,6 +297,46 @@ async function handleFetchApi(url, options, sendResponse) {
       statusText: errorMessage,
       error: errorMessage,
       data: null,
+    });
+  }
+}
+
+// Handle webhook requests from popup
+async function handleSendWebhook(data, sendResponse) {
+  try {
+    console.log("Sending webhook:", data);
+
+    // Send webhook to n8n server
+    const webhookUrl =
+      "https://n8n.srv803794.hstgr.cloud/webhook/df76bbf9-ed7e-4f95-a62e-2495fe836c63";
+
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (response.ok) {
+      sendResponse({
+        success: true,
+        message: "Webhook sent successfully",
+        status: response.status,
+      });
+    } else {
+      const errorText = await response.text();
+      sendResponse({
+        success: false,
+        error: `Webhook failed with status ${response.status}: ${errorText}`,
+        status: response.status,
+      });
+    }
+  } catch (error) {
+    console.error("Error sending webhook:", error);
+    sendResponse({
+      success: false,
+      error: error.message,
     });
   }
 }
