@@ -1006,6 +1006,22 @@ async function handleGenericEditor(editor, textToSet) {
   }
 }
 
+// ฟังก์ชันสำหรับจัดการชื่อสินค้าให้ปลอดภัย
+function cleanProductName(name) {
+  if (!name) return "";
+
+  // 1. ลบเครื่องหมาย " และ ' ออก
+  let cleaned = name.replace(/["']/g, "");
+
+  // 2. ลบเครื่องหมาย [ และ ] ออก (เพิ่มเติมตามคำแนะนำ)
+  cleaned = cleaned.replace(/[\[\]]/g, "");
+
+  // 3. ตัดให้เหลือไม่เกิน 30 ตัวอักษร
+  cleaned = cleaned.substring(0, 30).trim();
+
+  return cleaned;
+}
+
 async function addProduct(productId) {
   try {
     console.log("Adding product step-by-step:", productId);
@@ -1213,7 +1229,66 @@ async function addProduct(productId) {
     // Wait for next window to load
     await new Promise((r) => setTimeout(r, 1500));
 
-    // 7. Click "Add" on the final confirmation modal
+    // 7. Fill product name input (NEW STEP)
+    console.log("Looking for product name input field...");
+
+    // Try to find product name input field
+    // Based on user feedback, the input might have aria-label="Product name" or class "TUXTextInputCore-input"
+    let productNameInput = document.querySelector(
+      'input[aria-label="Product name"], input[aria-label*="product name"], input[placeholder*="Product name"], .TUXTextInputCore-input',
+    );
+
+    if (productNameInput) {
+      console.log(
+        "Found product name input field, filling with cleaned product name...",
+      );
+
+      // Get the original product name from the selected row
+      // We need to extract it from the targetRow we found earlier
+      let originalProductName = "";
+      if (targetRow) {
+        // Try to find product name in the row (excluding the product ID)
+        const rowText = targetRow.textContent || "";
+        // Remove product ID from the text to get product name
+        originalProductName = rowText.replace(productId, "").trim();
+
+        // If we couldn't extract a good name, use a default
+        if (!originalProductName || originalProductName.length < 2) {
+          originalProductName = `Product ${productId}`;
+        }
+      } else {
+        originalProductName = `Product ${productId}`;
+      }
+
+      // Clean the product name
+      const finalProductName = cleanProductName(originalProductName);
+      console.log(
+        `Original: "${originalProductName}" -> Cleaned: "${finalProductName}"`,
+      );
+
+      // Fill the input field
+      productNameInput.focus();
+
+      // Use execCommand for React compatibility
+      document.execCommand("selectAll", false, null);
+      document.execCommand("insertText", false, finalProductName);
+
+      // Fallback if execCommand fails
+      if (productNameInput.value !== finalProductName) {
+        productNameInput.value = finalProductName;
+      }
+
+      // IMPORTANT: Dispatch events to make React recognize the change
+      productNameInput.dispatchEvent(new Event("input", { bubbles: true }));
+      productNameInput.dispatchEvent(new Event("change", { bubbles: true }));
+
+      // Wait a bit for UI to update
+      await new Promise((r) => setTimeout(r, 800));
+    } else {
+      console.warn("Could not find product name input field, continuing...");
+    }
+
+    // 8. Click "Add" on the final confirmation modal
     console.log("Waiting for confirmation modal to click final Add button...");
 
     // Wait for modal content to transition
