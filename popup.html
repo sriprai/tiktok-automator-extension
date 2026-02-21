@@ -64,6 +64,48 @@
           </div>
         </div>
 
+        <!-- Post Mode Toggle -->
+        <div class="post-mode-toggle">
+          <div class="toggle-header">
+            <span class="toggle-label">Post Mode:</span>
+            <div class="toggle-buttons">
+              <button
+                class="toggle-btn active"
+                data-mode="manual-post"
+                id="manualPostToggle"
+              >
+                <i class="fas fa-hand-pointer"></i> Manual Post
+              </button>
+              <button
+                class="toggle-btn"
+                data-mode="manual-schedule"
+                id="manualScheduleToggle"
+              >
+                <i class="fas fa-calendar-plus"></i> Manual Schedule
+              </button>
+              <button
+                class="toggle-btn"
+                data-mode="auto-post"
+                id="autoPostToggle"
+              >
+                <i class="fas fa-bolt"></i> Auto Post
+              </button>
+              <button
+                class="toggle-btn"
+                data-mode="auto-schedule"
+                id="autoScheduleToggle"
+              >
+                <i class="fas fa-robot"></i> Auto Schedule
+              </button>
+            </div>
+          </div>
+          <div class="toggle-description">
+            <p id="postModeDescription">
+              Manually post videos immediately with one click
+            </p>
+          </div>
+        </div>
+
         <div class="loading-container" id="videosLoading">
           <div class="spinner"></div>
           <p>Loading videos...</p>

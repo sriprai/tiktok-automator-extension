@@ -14,6 +14,7 @@ let currentUser = null;
 let videos = [];
 let products = [];
 let accounts = [];
+let currentPostMode = "manual-post"; // "manual-post", "manual-schedule", "auto-post", "auto-schedule"
 
 // DOM Elements
 const userInfoEl = document.getElementById("userInfo");
@@ -145,6 +146,9 @@ function setupEventListeners() {
       hideUploadStatusWindow();
     });
   }
+
+  // Post mode toggle buttons
+  setupPostModeToggleListeners();
 }
 
 // Video Type Management
@@ -441,6 +445,88 @@ function createVideoCard(video) {
     video.product_id !== "none" &&
     video.product_id.trim() !== "";
 
+  // Determine which elements to show based on current post mode
+  const showManualPostElements = currentPostMode === "manual-post";
+  const showAutoPostElements = currentPostMode === "auto-post";
+  const showManualScheduleElements = currentPostMode === "manual-schedule";
+  const showAutoScheduleElements = currentPostMode === "auto-schedule";
+
+  // Build the video actions HTML based on post mode
+  let videoActionsHTML = "";
+
+  if (showManualPostElements) {
+    // Manual Post: Show icons and Post Now button, hide Auto Post button
+    videoActionsHTML = `
+      <div class="tooltip-container">
+        <button class="action-btn icon-only upload-btn" data-video-id="${video.id}" data-video-url="${videoUrl || ""}" data-caption="${caption}" title="Upload">
+            <i class="fas fa-upload"></i>
+        </button>
+        <span class="tooltip-text">Upload</span>
+      </div>
+      <div class="tooltip-container">
+        <button class="action-btn icon-only caption-btn" data-caption="${caption}" title="Caption">
+            <i class="fas fa-font"></i>
+        </button>
+        <span class="tooltip-text">Caption</span>
+      </div>
+      ${
+        hasProductId
+          ? `
+      <div class="tooltip-container">
+        <button class="action-btn icon-only product-id-btn" data-product-id="${video.product_id}" title="Product ID">
+            <i class="fas fa-tag"></i>
+        </button>
+        <span class="tooltip-text">Product ID</span>
+      </div>
+      `
+          : ""
+      }
+      <div class="tooltip-container">
+        <button class="action-btn icon-only ai-content-btn" title="AI Content">
+            <i class="fas fa-robot"></i>
+        </button>
+        <span class="tooltip-text">AI Content</span>
+      </div>
+      <button class="action-btn post-tiktok-btn" data-video-id="${video.id}" title="Post Now">
+          <i class="fab fa-tiktok"></i> Post Now
+          <div class="flex items-center gap-1 bg-black/20 px-2 py-1 rounded-md text-sm ml-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-coins h-4 w-4 text-yellow-500" aria-hidden="true">
+                  <circle cx="8" cy="8" r="6"></circle>
+                  <path d="M18.09 10.37A6 6 0 1 1 10.34 18"></path>
+                  <path d="M7 6h1v4"></path>
+                  <path d="m16.71 13.88.7.71-2.82 2.82"></path>
+              </svg>
+              0
+          </div>
+      </button>
+    `;
+  } else if (showAutoPostElements) {
+    // Auto Post: Hide all icons, just show Auto Post button
+    videoActionsHTML = `
+      <button class="action-btn auto-post-btn" data-video-id="${video.id}" data-video-url="${videoUrl || ""}" data-caption="${caption}" data-product-id="${video.product_id || ""}" title="Auto Post">
+          <i class="fas fa-bolt"></i> Auto Post
+          <div class="flex items-center gap-1 bg-black/20 px-2 py-1 rounded-md text-sm ml-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-coins h-4 w-4 text-yellow-500" aria-hidden="true">
+                  <circle cx="8" cy="8" r="6"></circle>
+                  <path d="M18.09 10.37A6 6 0 1 1 10.34 18"></path>
+                  <path d="M7 6h1v4"></path>
+                  <path d="m16.71 13.88.7.71-2.82 2.82"></path>
+              </svg>
+              5
+          </div>
+      </button>
+    `;
+  } else {
+    // Manual Schedule and Auto Schedule: Hide all for testing
+    videoActionsHTML = `
+      <div class="video-actions-placeholder">
+        <p style="font-size: 10px; color: #94a3b8; text-align: center; padding: 8px;">
+          Actions hidden for ${currentPostMode.replace("-", " ")} mode
+        </p>
+      </div>
+    `;
+  }
+
   card.innerHTML = `
         <div class="video-thumbnail">
             <img src="${thumbnailUrl}" alt="${video.title || "Video"}">
@@ -454,60 +540,7 @@ function createVideoCard(video) {
                 <span class="video-date">${formattedDate}</span>
             </div>
             <div class="video-actions">
-                <div class="tooltip-container">
-                  <button class="action-btn icon-only upload-btn" data-video-id="${video.id}" data-video-url="${videoUrl || ""}" data-caption="${caption}" title="Upload">
-                      <i class="fas fa-upload"></i>
-                  </button>
-                  <span class="tooltip-text">Upload</span>
-                </div>
-                <div class="tooltip-container">
-                  <button class="action-btn icon-only caption-btn" data-caption="${caption}" title="Caption">
-                      <i class="fas fa-font"></i>
-                  </button>
-                  <span class="tooltip-text">Caption</span>
-                </div>
-                ${
-                  hasProductId
-                    ? `
-                <div class="tooltip-container">
-                  <button class="action-btn icon-only product-id-btn" data-product-id="${video.product_id}" title="Product ID">
-                      <i class="fas fa-tag"></i>
-                  </button>
-                  <span class="tooltip-text">Product ID</span>
-                </div>
-                `
-                    : ""
-                }
-                <div class="tooltip-container">
-                  <button class="action-btn icon-only ai-content-btn" title="AI Content">
-                      <i class="fas fa-robot"></i>
-                  </button>
-                  <span class="tooltip-text">AI Content</span>
-                </div>
-                <button class="action-btn post-tiktok-btn" data-video-id="${video.id}" title="Post Now">
-                    <i class="fab fa-tiktok"></i> Post Now
-                    <div class="flex items-center gap-1 bg-black/20 px-2 py-1 rounded-md text-sm ml-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-coins h-4 w-4 text-yellow-500" aria-hidden="true">
-                            <circle cx="8" cy="8" r="6"></circle>
-                            <path d="M18.09 10.37A6 6 0 1 1 10.34 18"></path>
-                            <path d="M7 6h1v4"></path>
-                            <path d="m16.71 13.88.7.71-2.82 2.82"></path>
-                        </svg>
-                        0
-                    </div>
-                </button>
-                <button class="action-btn auto-post-btn" data-video-id="${video.id}" data-video-url="${videoUrl || ""}" data-caption="${caption}" data-product-id="${video.product_id || ""}" title="Auto Post">
-                    <i class="fas fa-bolt"></i> Auto Post
-                    <div class="flex items-center gap-1 bg-black/20 px-2 py-1 rounded-md text-sm ml-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-coins h-4 w-4 text-yellow-500" aria-hidden="true">
-                            <circle cx="8" cy="8" r="6"></circle>
-                            <path d="M18.09 10.37A6 6 0 1 1 10.34 18"></path>
-                            <path d="M7 6h1v4"></path>
-                            <path d="m16.71 13.88.7.71-2.82 2.82"></path>
-                        </svg>
-                        5
-                    </div>
-                </button>
+                ${videoActionsHTML}
             </div>
         </div>
     `;
@@ -1909,6 +1942,104 @@ function showCreditUpdateNotification(newCredits) {
   }, 1500);
 }
 
+// Post Mode Toggle Functions
+function setupPostModeToggleListeners() {
+  const manualPostToggle = document.getElementById("manualPostToggle");
+  const manualScheduleToggle = document.getElementById("manualScheduleToggle");
+  const autoPostToggle = document.getElementById("autoPostToggle");
+  const autoScheduleToggle = document.getElementById("autoScheduleToggle");
+  const postModeDescription = document.getElementById("postModeDescription");
+
+  if (
+    !manualPostToggle ||
+    !manualScheduleToggle ||
+    !autoPostToggle ||
+    !autoScheduleToggle ||
+    !postModeDescription
+  ) {
+    console.warn("Post mode toggle elements not found");
+    return;
+  }
+
+  // Set initial state
+  updatePostModeUI(currentPostMode);
+
+  // Add click event listeners
+  manualPostToggle.addEventListener("click", () => {
+    setPostMode("manual-post");
+  });
+
+  manualScheduleToggle.addEventListener("click", () => {
+    setPostMode("manual-schedule");
+  });
+
+  autoPostToggle.addEventListener("click", () => {
+    setPostMode("auto-post");
+  });
+
+  autoScheduleToggle.addEventListener("click", () => {
+    setPostMode("auto-schedule");
+  });
+}
+
+function setPostMode(mode) {
+  if (mode === currentPostMode) return;
+
+  currentPostMode = mode;
+  updatePostModeUI(mode);
+  console.log(`Post mode changed to: ${mode}`);
+
+  // Re-render videos to update action buttons based on new mode
+  if (videos.length > 0) {
+    renderVideos();
+  }
+}
+
+function updatePostModeUI(mode) {
+  const manualPostToggle = document.getElementById("manualPostToggle");
+  const manualScheduleToggle = document.getElementById("manualScheduleToggle");
+  const autoPostToggle = document.getElementById("autoPostToggle");
+  const autoScheduleToggle = document.getElementById("autoScheduleToggle");
+  const postModeDescription = document.getElementById("postModeDescription");
+
+  if (
+    !manualPostToggle ||
+    !manualScheduleToggle ||
+    !autoPostToggle ||
+    !autoScheduleToggle ||
+    !postModeDescription
+  ) {
+    return;
+  }
+
+  // Update toggle button states
+  manualPostToggle.classList.toggle("active", mode === "manual-post");
+  manualScheduleToggle.classList.toggle("active", mode === "manual-schedule");
+  autoPostToggle.classList.toggle("active", mode === "auto-post");
+  autoScheduleToggle.classList.toggle("active", mode === "auto-schedule");
+
+  // Update description based on mode
+  let description = "";
+  switch (mode) {
+    case "manual-post":
+      description = "Manually post videos immediately with one click";
+      break;
+    case "manual-schedule":
+      description = "Manually schedule videos for posting at specific times";
+      break;
+    case "auto-post":
+      description = "Automatically upload, fill caption, add product, and post";
+      break;
+    case "auto-schedule":
+      description = "Automatically schedule videos for optimal posting times";
+      break;
+    default:
+      description = "Select a post mode to continue";
+  }
+
+  postModeDescription.textContent = description;
+}
+
 // Export for background script
 window.TikTokAutomatorExtension = {
   checkAuth,
@@ -1920,4 +2051,6 @@ window.TikTokAutomatorExtension = {
   hideVideoPlayer,
   checkUploadPageStatus,
   updateUploadButtonsStatus,
+  setPostMode,
+  getCurrentPostMode: () => currentPostMode,
 };
