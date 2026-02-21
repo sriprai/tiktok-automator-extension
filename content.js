@@ -128,6 +128,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.action === "SET_SCHEDULE") {
+    setSchedule(message.data.hour, message.data.minute).then(sendResponse);
+    return true;
+  }
+
   if (message.action === "CHECK_LOGIN_STATUS") {
     const status = checkLoginStatus();
     sendResponse({ success: true, ...status });
@@ -1469,22 +1474,70 @@ async function waitForProcessing() {
 
 async function clickPostButton() {
   try {
-    console.log("เริ่มกระบวนการคลิกปุ่ม Post...");
+    console.log("Starting post/schedule button click process...");
 
-    // 1. หาปุ่มจาก data-e2e ตรงๆ
-    const candidates = Array.from(
+    // 1. First try to find post button with data-e2e
+    let postButton = null;
+    const postCandidates = Array.from(
       document.querySelectorAll('[data-e2e="post_video_button"]'),
     );
-    let postButton = candidates.find((el) => el.offsetParent !== null);
+    postButton = postCandidates.find((el) => el.offsetParent !== null);
+
+    // 2. Check if button text is "Schedule" (when schedule time is set)
+    if (postButton) {
+      const buttonText = postButton.textContent.toLowerCase();
+      console.log("Found post button with text:", buttonText);
+
+      // Check if button says "Schedule" instead of "Post"
+      if (buttonText.includes("schedule")) {
+        console.log("Button is in schedule mode (text: Schedule)");
+      }
+    }
+
+    // 3. If not found, look for schedule button by text
+    if (!postButton) {
+      console.log("Post button not found, looking for schedule button...");
+
+      // Look for buttons with text containing "Schedule" (exact match for schedule mode)
+      const allButtons = Array.from(document.querySelectorAll("button"));
+      const scheduleButton = allButtons.find((btn) => {
+        const text = btn.textContent.toLowerCase();
+        return text.includes("schedule") && !text.includes("schedule for");
+      });
+
+      if (scheduleButton) {
+        console.log("Found schedule button:", scheduleButton.textContent);
+        postButton = scheduleButton;
+      }
+    }
+
+    // 4. If still not found, look for any button with post/schedule text
+    if (!postButton) {
+      console.log("Looking for any post/schedule button by text...");
+      const allButtons = Array.from(document.querySelectorAll("button"));
+      const textButton = allButtons.find((btn) => {
+        const text = btn.textContent.toLowerCase();
+        return (
+          text.includes("post") ||
+          text.includes("schedule") ||
+          text.includes("publish")
+        );
+      });
+
+      if (textButton) {
+        console.log("Found button by text:", textButton.textContent);
+        postButton = textButton;
+      }
+    }
 
     if (!postButton) {
       return {
         success: false,
-        error: "หาปุ่ม Post ไม่เจอ (ลองตรวจสอบว่าวิดีโอโหลดเสร็จหรือยัง)",
+        error: "Could not find post/schedule button (check if video is loaded)",
       };
     }
 
-    // 2. เช็คว่าปุ่มล็อคอยู่ไหม (สำคัญมาก: ถ้าติ๊ก Copyright Check อยู่ ต้องรอให้มันเขียวถึงจะกดได้)
+    // 5. Check if button is locked/disabled
     const isLocked =
       postButton.disabled ||
       postButton.getAttribute("aria-disabled") === "true" ||
@@ -1495,11 +1548,11 @@ async function clickPostButton() {
       return {
         success: false,
         error:
-          "ปุ่มยังเป็นสีเทา (Disabled) ลองรอให้ระบบเช็คลิขสิทธิ์ (Copyright) ให้เสร็จก่อนครับ",
+          "Button is disabled (gray). Please wait for copyright check to complete.",
       };
     }
 
-    // 3. เลื่อนหน้าจอและคลิก
+    // 6. Scroll and click
     postButton.scrollIntoView({ behavior: "smooth", block: "center" });
     await new Promise((r) => setTimeout(r, 400));
 
@@ -1509,38 +1562,66 @@ async function clickPostButton() {
     postButton.dispatchEvent(new MouseEvent("mouseup", mouseParams));
     postButton.click();
 
-    // คลิกตัวเนื้อหาข้างในด้วยเพื่อความชัวร์
+    // Click inner content for safety
     const inner = postButton.querySelector(".Button__content");
     if (inner) inner.click();
 
-    // 4. ตรวจสอบ Popup "Continue to post?" (ถ้ามี)
-    console.log("กำลังตรวจสอบ Popup ยืนยันการโพสต์...");
-    await new Promise((r) => setTimeout(r, 2000)); // รอให้ Popup ปรากฏ
+    // 7. Check for confirmation popup (both "Continue to post?" and "Continue to schedule?")
+    console.log("Checking for confirmation popup...");
+    await new Promise((r) => setTimeout(r, 2000));
 
     const modalConfirm = document.querySelector(".common-modal-confirm-modal");
     if (
       modalConfirm &&
-      modalConfirm.textContent.includes("Continue to post?")
+      (modalConfirm.textContent.includes("Continue to post?") ||
+        modalConfirm.textContent.includes("Continue to schedule?"))
     ) {
-      console.log("พบ Popup 'Continue to post?', กำลังคลิก 'Post now'...");
-      const postNowButton = Array.from(
-        modalConfirm.querySelectorAll("button"),
-      ).find((btn) => btn.textContent.includes("Post now"));
+      console.log("Found confirmation popup, clicking confirm button...");
 
-      if (postNowButton) {
-        postNowButton.click();
-        console.log("คลิกปุ่ม 'Post now' ใน Popup เรียบร้อยแล้ว");
+      // Look for confirm button - check for both "Post now" and "Schedule now"
+      const confirmButtons = Array.from(
+        modalConfirm.querySelectorAll("button"),
+      );
+
+      // First try to find "Schedule now" (for schedule mode)
+      let confirmButton = confirmButtons.find((btn) => {
+        const text = btn.textContent.toLowerCase();
+        return text.includes("schedule now");
+      });
+
+      // If not found, try "Post now" (for regular post mode)
+      if (!confirmButton) {
+        confirmButton = confirmButtons.find((btn) => {
+          const text = btn.textContent.toLowerCase();
+          return text.includes("post now");
+        });
+      }
+
+      // If still not found, try generic confirm buttons
+      if (!confirmButton) {
+        confirmButton = confirmButtons.find((btn) => {
+          const text = btn.textContent.toLowerCase();
+          return text.includes("confirm") || text.includes("continue");
+        });
+      }
+
+      if (confirmButton) {
+        console.log(
+          "Clicked confirm button in popup:",
+          confirmButton.textContent,
+        );
+        confirmButton.click();
         return {
           success: true,
-          message: "คลิกปุ่ม Post และยืนยันใน Popup เรียบร้อยแล้ว!",
+          message: "Clicked post/schedule button and confirmed in popup!",
         };
       }
     }
 
-    // 5. Note: Webhook is now sent from popup.js, not from content script
-    // checkPostSuccessAndNotify();
-
-    return { success: true, message: "คลิกปุ่ม Post เรียบร้อยแล้ว!" };
+    return {
+      success: true,
+      message: "Clicked post/schedule button successfully!",
+    };
   } catch (error) {
     console.error("Error:", error);
     return { success: false, error: error.message };
@@ -1698,6 +1779,84 @@ async function sendErrorWebhook(errorMessage) {
 // Note: Removed the old helper UI from TikTok page
 // The status window is now in the extension popup instead
 
+// Schedule function
+async function setSchedule(hour, minute) {
+  try {
+    console.log(`Setting schedule: Time ${hour}:${minute}`);
+
+    // 1. Click Schedule radio button
+    const scheduleRadio = document.querySelector('input[value="schedule"]');
+    if (!scheduleRadio) {
+      return { success: false, message: "Schedule radio button not found" };
+    }
+
+    // Click the label or parent element
+    const scheduleLabel = scheduleRadio.closest("label");
+    if (scheduleLabel) {
+      scheduleLabel.click();
+    } else {
+      scheduleRadio.click();
+    }
+
+    console.log("Selected Schedule mode");
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    // 2. Handle time selection
+    const timeInputs = document.querySelectorAll(".TUXTextInputCore-input");
+
+    // Find time input (contains ":")
+    const timeInput = Array.from(timeInputs).find(
+      (i) => i.value && i.value.includes(":"),
+    );
+    if (timeInput) {
+      console.log("Found time input:", timeInput.value);
+      timeInput.click();
+      await new Promise((resolve) => setTimeout(resolve, 800));
+
+      // Select hour from left timepicker
+      const hourItems = document.querySelectorAll(".tiktok-timepicker-left");
+      const targetHourElement = Array.from(hourItems).find(
+        (el) => el.innerText && el.innerText.trim() === hour,
+      );
+
+      if (targetHourElement) {
+        targetHourElement.click();
+        console.log(`Selected hour: ${hour}`);
+      } else {
+        console.warn(`Hour ${hour} not found in timepicker`);
+      }
+
+      // Select minute from right timepicker
+      const minuteItems = document.querySelectorAll(".tiktok-timepicker-right");
+      const targetMinuteElement = Array.from(minuteItems).find(
+        (el) => el.innerText && el.innerText.trim() === minute,
+      );
+
+      if (targetMinuteElement) {
+        targetMinuteElement.click();
+        console.log(`Selected minute: ${minute}`);
+      } else {
+        console.warn(`Minute ${minute} not found in timepicker`);
+      }
+
+      // Click outside to close timepicker
+      document.body.click();
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    } else {
+      console.warn("Time input not found");
+    }
+
+    console.log("Schedule automation completed successfully");
+    return {
+      success: true,
+      message: `Schedule set for ${hour}:${minute}`,
+    };
+  } catch (error) {
+    console.error("Error in schedule automation:", error);
+    return { success: false, message: error.message };
+  }
+}
+
 // Export functions for manual testing
 window.TikTokAutomator = {
   checkLoginStatus,
@@ -1706,4 +1865,5 @@ window.TikTokAutomator = {
   setCaption,
   addProduct,
   clickPostButton,
+  setSchedule,
 };

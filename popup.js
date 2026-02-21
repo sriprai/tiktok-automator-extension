@@ -451,6 +451,12 @@ function createVideoCard(video) {
   const showManualScheduleElements = currentPostMode === "manual-schedule";
   const showAutoScheduleElements = currentPostMode === "auto-schedule";
 
+  // Get current time for default schedule values
+  const now = new Date();
+  const currentHour = now.getHours().toString().padStart(2, "0");
+  const currentMinute = Math.floor(now.getMinutes() / 5) * 5; // Round to nearest 5 minutes
+  const currentMinuteStr = currentMinute.toString().padStart(2, "0");
+
   // Build the video actions HTML based on post mode
   let videoActionsHTML = "";
 
@@ -516,8 +522,91 @@ function createVideoCard(video) {
           </div>
       </button>
     `;
+  } else if (showManualScheduleElements) {
+    // Manual Schedule: Show all icons, add time selection, and Post Now button (same as manual post)
+    videoActionsHTML = `
+      <div class="tooltip-container">
+        <button class="action-btn icon-only upload-btn" data-video-id="${video.id}" data-video-url="${videoUrl || ""}" data-caption="${caption}" title="Upload">
+            <i class="fas fa-upload"></i>
+        </button>
+        <span class="tooltip-text">Upload</span>
+      </div>
+      <div class="tooltip-container">
+        <button class="action-btn icon-only caption-btn" data-caption="${caption}" title="Caption">
+            <i class="fas fa-font"></i>
+        </button>
+        <span class="tooltip-text">Caption</span>
+      </div>
+      ${
+        hasProductId
+          ? `
+      <div class="tooltip-container">
+        <button class="action-btn icon-only product-id-btn" data-product-id="${video.product_id}" title="Product ID">
+            <i class="fas fa-tag"></i>
+        </button>
+        <span class="tooltip-text">Product ID</span>
+      </div>
+      `
+          : ""
+      }
+      <div class="tooltip-container">
+        <button class="action-btn icon-only ai-content-btn" title="AI Content">
+            <i class="fas fa-robot"></i>
+        </button>
+        <span class="tooltip-text">AI Content</span>
+      </div>
+      
+      <!-- Schedule Time Selection -->
+      <div class="schedule-time-selection" style="width: 100%; margin-top: 8px; margin-bottom: 8px; background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.8) 100%); padding: 8px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.3); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2); box-sizing: border-box;">
+        <div style="font-size: 10px; color: #94a3b8; margin-bottom: 4px; text-align: center; font-weight: 500;">Schedule Time</div>
+        <div style="display: flex; gap: 4px; justify-content: center; align-items: center; width: 100%;">
+          <div style="flex: 1; position: relative; min-width: 0;">
+            <select class="schedule-hour-select" data-video-id="${video.id}" style="width: 100%; padding: 4px 6px; border-radius: 6px; border: 1px solid rgba(59, 130, 246, 0.4); background: rgba(15, 23, 42, 0.9); color: #f1f5f9; font-size: 10px; font-weight: 500; appearance: none; cursor: pointer; transition: all 0.2s; box-sizing: border-box;">
+              <option value="">Hour</option>
+              ${Array.from({ length: 24 }, (_, i) => {
+                const hour = i.toString().padStart(2, "0");
+                const selected = hour === currentHour ? " selected" : "";
+                return `<option value="${hour}"${selected}>${hour}</option>`;
+              }).join("")}
+            </select>
+            <div style="position: absolute; right: 6px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #94a3b8; font-size: 9px;">▼</div>
+          </div>
+          <div style="color: #64748b; font-size: 10px; font-weight: bold; flex-shrink: 0;">:</div>
+          <div style="flex: 1; position: relative; min-width: 0;">
+            <select class="schedule-minute-select" data-video-id="${video.id}" style="width: 100%; padding: 4px 6px; border-radius: 6px; border: 1px solid rgba(59, 130, 246, 0.4); background: rgba(15, 23, 42, 0.9); color: #f1f5f9; font-size: 10px; font-weight: 500; appearance: none; cursor: pointer; transition: all 0.2s; box-sizing: border-box;">
+              <option value="">Minute</option>
+              ${Array.from({ length: 12 }, (_, i) => {
+                const minute = (i * 5).toString().padStart(2, "0");
+                const selected = minute === currentMinuteStr ? " selected" : "";
+                return `<option value="${minute}"${selected}>${minute}</option>`;
+              }).join("")}
+            </select>
+            <div style="position: absolute; right: 6px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #94a3b8; font-size: 9px;">▼</div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 4px; margin-top: 6px; width: 100%;">
+          <button class="action-btn set-schedule-btn" data-video-id="${video.id}" style="flex: 1; padding: 6px; font-size: 10px; background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.3) 100%); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 6px; font-weight: 500; transition: all 0.2s; cursor: pointer; box-sizing: border-box;">
+            <i class="fas fa-calendar-plus" style="margin-right: 3px;"></i> Set Schedule
+          </button>
+        </div>
+      </div>
+      
+      <!-- Post Now Button (same as manual post mode) -->
+      <button class="action-btn post-tiktok-btn" data-video-id="${video.id}" title="Post Now" style="margin-top: 8px; width: 100%;">
+          <i class="fab fa-tiktok"></i> Post Now
+          <div class="flex items-center gap-1 bg-black/20 px-2 py-1 rounded-md text-sm ml-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-coins h-4 w-4 text-yellow-500" aria-hidden="true">
+                  <circle cx="8" cy="8" r="6"></circle>
+                  <path d="M18.09 10.37A6 6 0 1 1 10.34 18"></path>
+                  <path d="M7 6h1v4"></path>
+                  <path d="m16.71 13.88.7.71-2.82 2.82"></path>
+              </svg>
+              0
+          </div>
+      </button>
+    `;
   } else {
-    // Manual Schedule and Auto Schedule: Hide all for testing
+    // Auto Schedule: Hide all for testing
     videoActionsHTML = `
       <div class="video-actions-placeholder">
         <p style="font-size: 10px; color: #94a3b8; text-align: center; padding: 8px;">
@@ -601,7 +690,7 @@ function createVideoCard(video) {
   if (productIdBtn) {
     productIdBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      handleProductIdClick(video.product_id, productIdTooltip);
+      handleProductIdClick(video.product_id, productIdTooltip, productIdBtn);
     });
   }
 
@@ -623,6 +712,23 @@ function createVideoCard(video) {
     autoPostBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       handleAutoPostClick(video, autoPostBtn);
+    });
+  }
+
+  // Add event listeners for schedule buttons (Manual Schedule mode)
+  const setScheduleBtn = card.querySelector(".set-schedule-btn");
+  const scheduleHourSelect = card.querySelector(".schedule-hour-select");
+  const scheduleMinuteSelect = card.querySelector(".schedule-minute-select");
+
+  if (setScheduleBtn) {
+    setScheduleBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      handleSetScheduleClick(
+        video,
+        scheduleHourSelect,
+        scheduleMinuteSelect,
+        setScheduleBtn,
+      );
     });
   }
 
@@ -1259,7 +1365,7 @@ async function handleCaptionClick(caption, tooltip) {
   }
 }
 
-async function handleProductIdClick(productId, tooltip) {
+async function handleProductIdClick(productId, tooltip, button) {
   console.log("Product ID button clicked:", productId);
 
   // 1. Copy product ID to clipboard (keep existing functionality)
@@ -1308,15 +1414,25 @@ async function handleProductIdClick(productId, tooltip) {
           },
           (response) => {
             if (response && response.success) {
-              const productIdBtns =
-                document.querySelectorAll(".product-id-btn");
-              productIdBtns.forEach((btn) => {
-                if (btn.dataset.productId === productId) {
-                  btn.innerHTML = '<i class="fas fa-check"></i> Added!';
-                }
-              });
+              // Don't change button text, just show success in tooltip
+              if (tooltip) {
+                tooltip.textContent = "Added!";
+                tooltip.style.color = "#22c55e";
+                setTimeout(() => {
+                  tooltip.textContent = "Product ID";
+                  tooltip.style.color = "";
+                }, 2000);
+              }
             } else if (response && response.error) {
               console.error("Failed to add product:", response.error);
+              if (tooltip) {
+                tooltip.textContent = "Failed";
+                tooltip.style.color = "#ef4444";
+                setTimeout(() => {
+                  tooltip.textContent = "Product ID";
+                  tooltip.style.color = "";
+                }, 2000);
+              }
             }
           },
         );
@@ -2040,6 +2156,286 @@ function updatePostModeUI(mode) {
   postModeDescription.textContent = description;
 }
 
+// Schedule Functions
+async function handleSetScheduleClick(video, hourSelect, minuteSelect, btn) {
+  console.log("Set Schedule button clicked for video:", video.id);
+
+  const hour = hourSelect ? hourSelect.value : "";
+  const minute = minuteSelect ? minuteSelect.value : "";
+
+  if (!hour || !minute) {
+    alert("Please select both hour and minute for scheduling");
+    return;
+  }
+
+  const isOnUploadPage = await checkUploadPageStatus();
+  if (!isOnUploadPage) {
+    alert("Please open TikTok upload page first");
+    console.log("User not on TikTok upload page. Schedule aborted.");
+    return;
+  }
+
+  const originalHTML = btn.innerHTML;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Setting...';
+  btn.disabled = true;
+
+  try {
+    // Get the first TikTok upload tab
+    const allTabs = await chrome.tabs.query({});
+    const uploadTabs = allTabs.filter((tab) => {
+      if (!tab.url) return false;
+      const url = tab.url.toLowerCase();
+      return (
+        url.includes("tiktok.com/upload") ||
+        url.includes("tiktok.com/tiktokstudio/upload")
+      );
+    });
+
+    if (uploadTabs.length === 0) {
+      console.log("No TikTok upload page found.");
+      btn.innerHTML = originalHTML;
+      btn.disabled = false;
+      return;
+    }
+
+    const uploadTab = uploadTabs[0];
+
+    // Set the schedule on the upload page
+    chrome.tabs.sendMessage(
+      uploadTab.id,
+      {
+        action: "SET_SCHEDULE",
+        data: {
+          hour: hour,
+          minute: minute,
+        },
+      },
+      (scheduleResponse) => {
+        if (chrome.runtime.lastError) {
+          console.error("Error setting schedule:", chrome.runtime.lastError);
+          btn.innerHTML = originalHTML;
+          btn.disabled = false;
+          return;
+        }
+
+        if (scheduleResponse && scheduleResponse.success) {
+          console.log("Schedule set successfully!");
+
+          // Store the schedule time for this video
+          const scheduleData = {
+            videoId: video.id,
+            hour: hour,
+            minute: minute,
+            timestamp: Date.now(),
+          };
+
+          chrome.storage.local.set({
+            [`schedule_${video.id}`]: scheduleData,
+          });
+
+          btn.innerHTML = '<i class="fas fa-check"></i> Set!';
+          btn.style.background = "rgba(34, 197, 94, 0.2)";
+          btn.style.color = "#22c55e";
+          setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.style.background = "";
+            btn.style.color = "";
+            btn.disabled = false;
+          }, 2000);
+        } else {
+          console.error("Schedule failed:", scheduleResponse?.error);
+          btn.innerHTML = '<i class="fas fa-times"></i> Failed';
+          btn.style.color = "#ef4444";
+          setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.style.color = "";
+            btn.disabled = false;
+          }, 2000);
+        }
+      },
+    );
+  } catch (error) {
+    console.error("Error in handleSetScheduleClick:", error);
+    btn.innerHTML = '<i class="fas fa-times"></i> Error';
+    btn.style.color = "#ef4444";
+    setTimeout(() => {
+      btn.innerHTML = originalHTML;
+      btn.style.color = "";
+      btn.disabled = false;
+    }, 2000);
+  }
+}
+
+async function handleScheduleNowClick(video, hourSelect, minuteSelect, btn) {
+  console.log("Schedule Now button clicked for video:", video.id);
+
+  const hour = hourSelect ? hourSelect.value : "";
+  const minute = minuteSelect ? minuteSelect.value : "";
+
+  if (!hour || !minute) {
+    alert("Please select both hour and minute for scheduling");
+    return;
+  }
+
+  const isOnUploadPage = await checkUploadPageStatus();
+  if (!isOnUploadPage) {
+    alert("Please open TikTok upload page first");
+    console.log("User not on TikTok upload page. Schedule aborted.");
+    return;
+  }
+
+  const originalHTML = btn.innerHTML;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Scheduling...';
+  btn.disabled = true;
+
+  try {
+    // Get the first TikTok upload tab
+    const allTabs = await chrome.tabs.query({});
+    const uploadTabs = allTabs.filter((tab) => {
+      if (!tab.url) return false;
+      const url = tab.url.toLowerCase();
+      return (
+        url.includes("tiktok.com/upload") ||
+        url.includes("tiktok.com/tiktokstudio/upload")
+      );
+    });
+
+    if (uploadTabs.length === 0) {
+      console.log("No TikTok upload page found.");
+      btn.innerHTML = originalHTML;
+      btn.disabled = false;
+      return;
+    }
+
+    const uploadTab = uploadTabs[0];
+    const caption = video.tone || `${video.title} - ${video.price}`;
+
+    // First, upload the video and set caption
+    chrome.tabs.sendMessage(
+      uploadTab.id,
+      {
+        action: "UPLOAD_VIDEO",
+        data: {
+          taskId: video.id,
+          videoUrl: video.complete_video || video.video_url,
+          caption: caption,
+        },
+      },
+      async (uploadResponse) => {
+        if (chrome.runtime.lastError) {
+          console.error("Error uploading video:", chrome.runtime.lastError);
+          btn.innerHTML = originalHTML;
+          btn.disabled = false;
+          return;
+        }
+
+        if (!uploadResponse || !uploadResponse.success) {
+          console.error("Upload failed:", uploadResponse?.error);
+          btn.innerHTML = originalHTML;
+          btn.disabled = false;
+          return;
+        }
+
+        // Wait for video processing
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+
+        // Now set the schedule
+        chrome.tabs.sendMessage(
+          uploadTab.id,
+          {
+            action: "SET_SCHEDULE",
+            data: {
+              hour: hour,
+              minute: minute,
+            },
+          },
+          async (scheduleResponse) => {
+            if (chrome.runtime.lastError) {
+              console.error(
+                "Error setting schedule:",
+                chrome.runtime.lastError,
+              );
+              btn.innerHTML = originalHTML;
+              btn.disabled = false;
+              return;
+            }
+
+            if (scheduleResponse && scheduleResponse.success) {
+              console.log("Schedule set successfully!");
+
+              // Now click the post/schedule button (same as Post Now)
+              chrome.tabs.sendMessage(
+                uploadTab.id,
+                {
+                  action: "CLICK_POST",
+                  data: { taskId: video.id },
+                },
+                (postResponse) => {
+                  if (chrome.runtime.lastError) {
+                    console.error(
+                      "Error clicking post button:",
+                      chrome.runtime.lastError,
+                    );
+                    btn.innerHTML = originalHTML;
+                    btn.disabled = false;
+                    return;
+                  }
+
+                  if (postResponse && postResponse.success) {
+                    // Send webhook after schedule is successful
+                    sendWebhookEvent(
+                      "schedule_success",
+                      video.id,
+                      "schedule_now",
+                    );
+
+                    btn.innerHTML = '<i class="fas fa-check"></i> Scheduled!';
+                    btn.style.background = "rgba(59, 130, 246, 0.2)";
+                    btn.style.color = "#3b82f6";
+                    setTimeout(() => {
+                      btn.innerHTML = originalHTML;
+                      btn.style.background = "";
+                      btn.style.color = "";
+                      btn.disabled = false;
+                    }, 3000);
+                  } else {
+                    console.error("Post failed:", postResponse?.error);
+                    btn.innerHTML = '<i class="fas fa-times"></i> Failed';
+                    btn.style.color = "#ef4444";
+                    setTimeout(() => {
+                      btn.innerHTML = originalHTML;
+                      btn.style.color = "";
+                      btn.disabled = false;
+                    }, 2000);
+                  }
+                },
+              );
+            } else {
+              console.error("Schedule failed:", scheduleResponse?.error);
+              btn.innerHTML = '<i class="fas fa-times"></i> Failed';
+              btn.style.color = "#ef4444";
+              setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.style.color = "";
+                btn.disabled = false;
+              }, 2000);
+            }
+          },
+        );
+      },
+    );
+  } catch (error) {
+    console.error("Error in handleScheduleNowClick:", error);
+    btn.innerHTML = '<i class="fas fa-times"></i> Error';
+    btn.style.color = "#ef4444";
+    setTimeout(() => {
+      btn.innerHTML = originalHTML;
+      btn.style.color = "";
+      btn.disabled = false;
+    }, 2000);
+  }
+}
+
 // Export for background script
 window.TikTokAutomatorExtension = {
   checkAuth,
@@ -2053,4 +2449,6 @@ window.TikTokAutomatorExtension = {
   updateUploadButtonsStatus,
   setPostMode,
   getCurrentPostMode: () => currentPostMode,
+  handleSetScheduleClick,
+  handleScheduleNowClick,
 };
