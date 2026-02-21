@@ -615,7 +615,8 @@ body {
   transform: translateY(0);
 }
 
-.auto-post-btn {
+.auto-post-btn,
+.auto-schedule-btn {
   flex: 1;
   min-width: 100%;
   margin-top: 8px;
@@ -628,17 +629,20 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.auto-post-btn:hover:not(:disabled) {
+.auto-post-btn:hover:not(:disabled),
+.auto-schedule-btn:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 6px 16px rgba(245, 158, 11, 0.4);
   filter: brightness(1.1);
 }
 
-.auto-post-btn:active:not(:disabled) {
+.auto-post-btn:active:not(:disabled),
+.auto-schedule-btn:active:not(:disabled) {
   transform: translateY(0);
 }
 
-.auto-post-btn:disabled {
+.auto-post-btn:disabled,
+.auto-schedule-btn:disabled {
   background: linear-gradient(90deg, #64748b 0%, #94a3b8 100%);
   opacity: 0.6;
   cursor: not-allowed;

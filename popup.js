@@ -605,8 +605,55 @@ function createVideoCard(video) {
           </div>
       </button>
     `;
+  } else if (showAutoScheduleElements) {
+    // Auto Schedule: Show time selection and Auto Schedule button (no Set Schedule button needed)
+    videoActionsHTML = `
+      <!-- Schedule Time Selection -->
+      <div class="schedule-time-selection" style="width: 100%; margin-top: 8px; margin-bottom: 8px; background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.8) 100%); padding: 8px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.3); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2); box-sizing: border-box;">
+        <div style="font-size: 10px; color: #94a3b8; margin-bottom: 4px; text-align: center; font-weight: 500;">Schedule Time</div>
+        <div style="display: flex; gap: 4px; justify-content: center; align-items: center; width: 100%;">
+          <div style="flex: 1; position: relative; min-width: 0;">
+            <select class="schedule-hour-select" data-video-id="${video.id}" style="width: 100%; padding: 4px 6px; border-radius: 6px; border: 1px solid rgba(59, 130, 246, 0.4); background: rgba(15, 23, 42, 0.9); color: #f1f5f9; font-size: 10px; font-weight: 500; appearance: none; cursor: pointer; transition: all 0.2s; box-sizing: border-box;">
+              <option value="">Hour</option>
+              ${Array.from({ length: 24 }, (_, i) => {
+                const hour = i.toString().padStart(2, "0");
+                const selected = hour === currentHour ? " selected" : "";
+                return `<option value="${hour}"${selected}>${hour}</option>`;
+              }).join("")}
+            </select>
+            <div style="position: absolute; right: 6px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #94a3b8; font-size: 9px;">▼</div>
+          </div>
+          <div style="color: #64748b; font-size: 10px; font-weight: bold; flex-shrink: 0;">:</div>
+          <div style="flex: 1; position: relative; min-width: 0;">
+            <select class="schedule-minute-select" data-video-id="${video.id}" style="width: 100%; padding: 4px 6px; border-radius: 6px; border: 1px solid rgba(59, 130, 246, 0.4); background: rgba(15, 23, 42, 0.9); color: #f1f5f9; font-size: 10px; font-weight: 500; appearance: none; cursor: pointer; transition: all 0.2s; box-sizing: border-box;">
+              <option value="">Minute</option>
+              ${Array.from({ length: 12 }, (_, i) => {
+                const minute = (i * 5).toString().padStart(2, "0");
+                const selected = minute === currentMinuteStr ? " selected" : "";
+                return `<option value="${minute}"${selected}>${minute}</option>`;
+              }).join("")}
+            </select>
+            <div style="position: absolute; right: 6px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #94a3b8; font-size: 9px;">▼</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Auto Schedule Button (same as Auto Post style) -->
+      <button class="action-btn auto-schedule-btn" data-video-id="${video.id}" data-video-url="${videoUrl || ""}" data-caption="${caption}" data-product-id="${video.product_id || ""}" title="Auto Schedule" style="margin-top: 8px; width: 100%;">
+          <i class="fas fa-bolt"></i> Auto Post
+          <div class="flex items-center gap-1 bg-black/20 px-2 py-1 rounded-md text-sm ml-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-coins h-4 w-4 text-yellow-500" aria-hidden="true">
+                  <circle cx="8" cy="8" r="6"></circle>
+                  <path d="M18.09 10.37A6 6 0 1 1 10.34 18"></path>
+                  <path d="M7 6h1v4"></path>
+                  <path d="m16.71 13.88.7.71-2.82 2.82"></path>
+              </svg>
+              5
+          </div>
+      </button>
+    `;
   } else {
-    // Auto Schedule: Hide all for testing
+    // Fallback for unknown modes
     videoActionsHTML = `
       <div class="video-actions-placeholder">
         <p style="font-size: 10px; color: #94a3b8; text-align: center; padding: 8px;">
@@ -728,6 +775,20 @@ function createVideoCard(video) {
         scheduleHourSelect,
         scheduleMinuteSelect,
         setScheduleBtn,
+      );
+    });
+  }
+
+  // Add event listener for Auto Schedule button
+  const autoScheduleBtn = card.querySelector(".auto-schedule-btn");
+  if (autoScheduleBtn) {
+    autoScheduleBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      handleAutoScheduleClick(
+        video,
+        autoScheduleBtn,
+        scheduleHourSelect,
+        scheduleMinuteSelect,
       );
     });
   }
@@ -2436,6 +2497,250 @@ async function handleScheduleNowClick(video, hourSelect, minuteSelect, btn) {
   }
 }
 
+async function handleAutoScheduleClick(video, btn, hourSelect, minuteSelect) {
+  console.log("Auto Schedule button clicked for video:", video.id);
+
+  const hour = hourSelect ? hourSelect.value : "";
+  const minute = minuteSelect ? minuteSelect.value : "";
+
+  if (!hour || !minute) {
+    alert("Please select both hour and minute for scheduling");
+    return;
+  }
+
+  const isOnUploadPage = await checkUploadPageStatus();
+  if (!isOnUploadPage) {
+    alert("Please open TikTok upload page first");
+    console.log("User not on TikTok upload page. Auto Schedule aborted.");
+    return;
+  }
+
+  const originalHTML = btn.innerHTML;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Auto Scheduling...';
+  btn.disabled = true;
+
+  try {
+    // Get the first TikTok upload tab
+    const allTabs = await chrome.tabs.query({});
+    const uploadTabs = allTabs.filter((tab) => {
+      if (!tab.url) return false;
+      const url = tab.url.toLowerCase();
+      return (
+        url.includes("tiktok.com/upload") ||
+        url.includes("tiktok.com/tiktokstudio/upload")
+      );
+    });
+
+    if (uploadTabs.length === 0) {
+      console.log("No TikTok upload page found.");
+      btn.innerHTML = originalHTML;
+      btn.disabled = false;
+      return;
+    }
+
+    const uploadTab = uploadTabs[0];
+    const caption = video.tone || `${video.title} - ${video.price}`;
+    const hasProductId =
+      video.product_id &&
+      video.product_id.trim() !== "" &&
+      video.product_id !== "manual" &&
+      video.product_id !== "none";
+
+    // Helper function to send message with retry logic
+    async function sendMessageWithRetry(action, data, maxRetries = 3) {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`Attempt ${attempt} to send ${action} message...`);
+
+          const response = await new Promise((resolve, reject) => {
+            chrome.tabs.sendMessage(
+              uploadTab.id,
+              { action, data },
+              (response) => {
+                if (chrome.runtime.lastError) {
+                  reject(new Error(chrome.runtime.lastError.message));
+                } else {
+                  resolve(response);
+                }
+              },
+            );
+          });
+
+          console.log(
+            `${action} message sent successfully on attempt ${attempt}`,
+          );
+          return response;
+        } catch (error) {
+          console.warn(
+            `Attempt ${attempt} failed for ${action}:`,
+            error.message,
+          );
+
+          if (attempt < maxRetries) {
+            // Wait before retrying
+            await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+
+            // Try to inject content script if it's not loaded
+            if (error.message.includes("Receiving end does not exist")) {
+              console.log("Attempting to inject content script...");
+              try {
+                await chrome.scripting.executeScript({
+                  target: { tabId: uploadTab.id },
+                  files: ["content.js"],
+                });
+                console.log("Content script injected successfully");
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+              } catch (injectError) {
+                console.warn(
+                  "Failed to inject content script:",
+                  injectError.message,
+                );
+              }
+            }
+          } else {
+            throw error;
+          }
+        }
+      }
+    }
+
+    // Step 1: Upload video
+    console.log("Step 1: Uploading video...");
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+
+    const uploadResult = await sendMessageWithRetry("UPLOAD_VIDEO", {
+      taskId: video.id,
+      videoUrl: video.complete_video || video.video_url,
+      caption: caption,
+    });
+
+    if (!uploadResult || !uploadResult.success) {
+      console.error("Upload failed:", uploadResult?.error);
+      btn.innerHTML = '<i class="fas fa-times"></i> Upload Failed';
+      btn.style.color = "#ef4444";
+      setTimeout(() => {
+        btn.innerHTML = originalHTML;
+        btn.style.color = "";
+        btn.disabled = false;
+      }, 2000);
+      return;
+    }
+
+    // Wait for video processing
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    // Step 2: Set caption
+    console.log("Step 2: Setting caption...");
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Setting caption...';
+
+    const captionResult = await sendMessageWithRetry("SET_CAPTION", {
+      caption: caption,
+    });
+
+    if (!captionResult || !captionResult.success) {
+      console.warn("Caption setting failed:", captionResult?.error);
+      // Continue anyway - caption might already be set from upload
+    }
+
+    // Wait a bit
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    // Step 3: Add product ID if available
+    if (hasProductId) {
+      console.log("Step 3: Adding product ID...");
+      btn.innerHTML =
+        '<i class="fas fa-spinner fa-spin"></i> Adding product...';
+
+      const productResult = await sendMessageWithRetry("ADD_PRODUCT", {
+        productId: video.product_id,
+      });
+
+      if (!productResult || !productResult.success) {
+        console.warn("Product addition failed:", productResult?.error);
+        // Continue anyway - product might not be required
+      }
+
+      // Wait a bit
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+
+    // Step 4: Enable AI content
+    console.log("Step 4: Enabling AI content...");
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enabling AI...';
+
+    const aiResult = await sendMessageWithRetry("TOGGLE_AI_CONTENT", {});
+
+    if (!aiResult || !aiResult.success) {
+      console.warn("AI content enabling failed:", aiResult?.error);
+      // Continue anyway - AI might already be enabled or not available
+    }
+
+    // Wait a bit
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    // Step 5: Set schedule time
+    console.log("Step 5: Setting schedule time...");
+    btn.innerHTML =
+      '<i class="fas fa-spinner fa-spin"></i> Setting schedule...';
+
+    const scheduleResult = await sendMessageWithRetry("SET_SCHEDULE", {
+      hour: hour,
+      minute: minute,
+    });
+
+    if (!scheduleResult || !scheduleResult.success) {
+      console.warn("Schedule setting failed:", scheduleResult?.error);
+      // Continue anyway - schedule might not be required or already set
+    }
+
+    // Wait a bit
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    // Step 6: Click Post button (which will be "Schedule" button when schedule time is set)
+    console.log("Step 6: Clicking Post/Schedule button...");
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Scheduling...';
+
+    const postResult = await sendMessageWithRetry("CLICK_POST", {
+      taskId: video.id,
+    });
+
+    if (postResult && postResult.success) {
+      console.log("Auto Schedule completed successfully!");
+
+      // Send webhook after schedule is successful
+      sendWebhookEvent("schedule_success", video.id, "auto_schedule");
+
+      btn.innerHTML = '<i class="fas fa-check"></i> Auto Scheduled!';
+      btn.style.background = "rgba(59, 130, 246, 0.2)";
+      btn.style.color = "#3b82f6";
+      setTimeout(() => {
+        btn.innerHTML = originalHTML;
+        btn.style.background = "";
+        btn.style.color = "";
+        btn.disabled = false;
+      }, 3000);
+    } else {
+      console.error("Schedule failed:", postResult?.error);
+      btn.innerHTML = '<i class="fas fa-times"></i> Schedule Failed';
+      btn.style.color = "#ef4444";
+      setTimeout(() => {
+        btn.innerHTML = originalHTML;
+        btn.style.color = "";
+        btn.disabled = false;
+      }, 2000);
+    }
+  } catch (error) {
+    console.error("Error in handleAutoScheduleClick:", error);
+    btn.innerHTML = '<i class="fas fa-times"></i> Error';
+    btn.style.color = "#ef4444";
+    setTimeout(() => {
+      btn.innerHTML = originalHTML;
+      btn.style.color = "";
+      btn.disabled = false;
+    }, 2000);
+  }
+}
+
 // Export for background script
 window.TikTokAutomatorExtension = {
   checkAuth,
@@ -2451,4 +2756,5 @@ window.TikTokAutomatorExtension = {
   getCurrentPostMode: () => currentPostMode,
   handleSetScheduleClick,
   handleScheduleNowClick,
+  handleAutoScheduleClick,
 };
