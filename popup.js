@@ -1207,7 +1207,8 @@ async function sendWebhookEvent(eventType, videoId, buttonType) {
       video_id: videoId,
       button_type: buttonType,
       timestamp: new Date().toISOString(),
-      credits_used: buttonType === "auto_post" ? 5 : 0, // Auto Post uses 5 credits, Post Now uses 0
+      credits_used:
+        buttonType === "auto_post" || buttonType === "auto_schedule" ? 5 : 0, // Auto Post and Auto Schedule use 5 credits, Post Now uses 0
     };
 
     console.log(`Sending webhook for ${buttonType}:`, webhookData);
@@ -1287,7 +1288,7 @@ async function checkUploadPageStatus() {
 async function updateUploadButtonsStatus() {
   const isOnUploadPage = await checkUploadPageStatus();
   const actionButtons = document.querySelectorAll(
-    ".upload-btn, .caption-btn, .product-id-btn, .ai-content-btn, .post-tiktok-btn, .auto-post-btn",
+    ".upload-btn, .caption-btn, .product-id-btn, .ai-content-btn, .post-tiktok-btn, .auto-post-btn, .auto-schedule-btn, .set-schedule-btn, .schedule-hour-select, .schedule-minute-select",
   );
 
   actionButtons.forEach((btn) => {
@@ -1302,6 +1303,16 @@ async function updateUploadButtonsStatus() {
       if (btn.classList.contains("ai-content-btn")) btn.title = "AI Content";
       if (btn.classList.contains("post-tiktok-btn")) btn.title = "Post Now";
       if (btn.classList.contains("auto-post-btn")) btn.title = "Auto Post";
+      if (btn.classList.contains("auto-schedule-btn"))
+        btn.title = "Auto Schedule";
+      if (btn.classList.contains("set-schedule-btn"))
+        btn.title = "Set Schedule";
+      if (
+        btn.classList.contains("schedule-hour-select") ||
+        btn.classList.contains("schedule-minute-select")
+      ) {
+        btn.title = "Select schedule time";
+      }
     } else {
       btn.disabled = true;
       btn.style.opacity = "0.5";
