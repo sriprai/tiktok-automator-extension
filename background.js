@@ -462,7 +462,7 @@ if (chrome.contextMenus && chrome.contextMenus.onClicked) {
   chrome.contextMenus.onClicked.addListener((info, tab) => {
     if (info.menuItemId === "openDashboard") {
       chrome.tabs.create({
-        url: "https://automatorx.thairiches.com/dashboard",
+        url: "https://automatorx.co/dashboard",
       });
     } else if (info.menuItemId === "checkLoginStatus") {
       if (tab?.url?.includes("tiktok.com")) {

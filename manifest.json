@@ -14,7 +14,7 @@
   "host_permissions": [
     "http://localhost:3000/*",
     "https://*.tiktok.com/*",
-    "https://automatorx.thairiches.com/*",
+    "https://automatorx.co/*",
     "https://n8n.srv803794.hstgr.cloud/*"
   ],
   "action": {
@@ -34,7 +34,7 @@
       "matches": [
         "http://localhost:3000/*",
         "https://tiktok-automator.vercel.app/*",
-        "https://automatorx.thairiches.com/*"
+        "https://automatorx.co/*"
       ],
       "js": ["webapp-content.js"],
       "run_at": "document_idle"

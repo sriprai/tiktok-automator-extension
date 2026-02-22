@@ -2,7 +2,7 @@
 // Main popup functionality
 
 // Configuration
-const API_BASE_URL = "https://automatorx.thairiches.com"; // Change to your production URL
+const API_BASE_URL = "https://automatorx.co"; // Change to your production URL
 const STORAGE_KEYS = {
   USER: "tiktok_automator_user",
   TOKEN: "tiktok_automator_token",
