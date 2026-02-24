@@ -9,6 +9,9 @@ const STORAGE_KEYS = {
   LAST_SYNC: "tiktok_automator_last_sync",
 };
 
+// Premium plans that can use premium features
+const PREMIUM_PLANS = ["pro", "ultra", "vip"];
+
 // State
 let currentUser = null;
 let videos = [];
@@ -230,6 +233,153 @@ async function checkAuth(forceRefresh = false) {
   }
 }
 
+// Plan checking functions
+function hasPremiumPlan() {
+  if (!currentUser) return false;
+
+  // Check if user has a plan field
+  const userPlan =
+    currentUser.plan || currentUser.subscription_plan || currentUser.tier;
+
+  if (!userPlan) {
+    // If no plan field exists, assume free tier
+    return false;
+  }
+
+  // Check if plan is in premium plans (case-insensitive)
+  const planLower = userPlan.toLowerCase().trim();
+  return PREMIUM_PLANS.some(
+    (premiumPlan) => planLower === premiumPlan.toLowerCase(),
+  );
+}
+
+function showPlanUpgradeMessage() {
+  // Create a modal or alert to show upgrade message
+  const message = `
+    <div style="
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      padding: 20px;
+    ">
+      <div style="
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        border-radius: 16px;
+        padding: 32px;
+        max-width: 400px;
+        width: 100%;
+        border: 1px solid #475569;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        text-align: center;
+      ">
+        <div style="
+          font-size: 48px;
+          margin-bottom: 20px;
+          color: #8b5cf6;
+        ">
+          ⭐
+        </div>
+        <h2 style="
+          color: #f1f5f9;
+          font-size: 24px;
+          margin-bottom: 16px;
+          font-weight: 600;
+        ">
+          Premium Feature Required
+        </h2>
+        <p style="
+          color: #94a3b8;
+          line-height: 1.6;
+          margin-bottom: 24px;
+          font-size: 16px;
+        ">
+          This feature is only available for Pro, Ultra, or VIP plan members.
+          Upgrade your plan to unlock premium automation features and enhance your TikTok workflow.
+        </p>
+        <div style="
+          display: flex;
+          gap: 12px;
+          justify-content: center;
+          margin-top: 24px;
+        ">
+          <button id="upgradePlanBtn" style="
+            padding: 12px 24px;
+            background: linear-gradient(90deg, #8b5cf6 0%, #06b6d4 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+          ">
+            Upgrade Plan
+          </button>
+          <button id="closePlanMessageBtn" style="
+            padding: 12px 24px;
+            background: rgba(30, 41, 59, 0.7);
+            color: #cbd5e1;
+            border: 1px solid #475569;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+          ">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Create and append the modal
+  const modal = document.createElement("div");
+  modal.innerHTML = message;
+  modal.id = "planUpgradeModal";
+  document.body.appendChild(modal);
+
+  // Add event listeners
+  document.getElementById("upgradePlanBtn").addEventListener("click", () => {
+    // Open web app upgrade page
+    if (typeof chrome !== "undefined" && chrome.tabs && chrome.tabs.create) {
+      chrome.tabs.create({
+        url: "https://www.automatorx.co/dashboard/billing",
+      });
+    } else {
+      window.open("https://www.automatorx.co/dashboard/billing", "_blank");
+    }
+    // Remove modal
+    document.body.removeChild(modal);
+  });
+
+  document
+    .getElementById("closePlanMessageBtn")
+    .addEventListener("click", () => {
+      document.body.removeChild(modal);
+    });
+
+  // Close modal when clicking outside
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) {
+      document.body.removeChild(modal);
+    }
+  });
+}
+
+function checkPremiumFeatureAccess(featureName = "this feature") {
+  if (!hasPremiumPlan()) {
+    showPlanUpgradeMessage();
+    return false;
+  }
+  return true;
+}
+
 function updateUserUI() {
   if (!currentUser) return;
 
@@ -246,11 +396,27 @@ function updateUserUI() {
   // Get first character for avatar
   const avatarChar = userName.charAt(0).toUpperCase();
 
+  // Get user plan
+  const userPlan =
+    currentUser.plan ||
+    currentUser.subscription_plan ||
+    currentUser.tier ||
+    "Free";
+  const isPremium = hasPremiumPlan();
+
+  // Create plan badge
+  const planBadge = isPremium
+    ? `<span class="plan-badge premium" title="Premium Plan">${userPlan}</span>`
+    : `<span class="plan-badge free" title="Free Plan">${userPlan}</span>`;
+
   // Update user info
   userInfoEl.innerHTML = `
         <div class="logged-in">
             <div class="avatar">${avatarChar}</div>
-            <div class="email">${userEmail}</div>
+            <div class="user-details">
+                <div class="email">${userEmail}</div>
+                <div class="plan-info">${planBadge}</div>
+            </div>
         </div>
     `;
 
@@ -264,7 +430,13 @@ function updateUserUI() {
   // Show logout button
   document.getElementById("logoutBtn").style.display = "flex";
 
-  console.log("User UI updated:", { userName, userEmail, userCredits });
+  console.log("User UI updated:", {
+    userName,
+    userEmail,
+    userCredits,
+    userPlan,
+    isPremium,
+  });
 }
 
 function showLoginContainer() {
@@ -1288,7 +1460,7 @@ async function checkUploadPageStatus() {
 async function updateUploadButtonsStatus() {
   const isOnUploadPage = await checkUploadPageStatus();
   const actionButtons = document.querySelectorAll(
-    ".upload-btn, .caption-btn, .product-id-btn, .ai-content-btn, .post-tiktok-btn, .auto-post-btn, .auto-schedule-btn, .set-schedule-btn, .schedule-hour-select, .schedule-minute-select",
+    ".caption-btn, .product-id-btn, .ai-content-btn, .post-tiktok-btn, .auto-post-btn, .auto-schedule-btn, .set-schedule-btn, .schedule-hour-select, .schedule-minute-select",
   );
 
   actionButtons.forEach((btn) => {
@@ -1297,7 +1469,6 @@ async function updateUploadButtonsStatus() {
       btn.style.opacity = "1";
       btn.style.cursor = "pointer";
       btn.style.filter = "none";
-      if (btn.classList.contains("upload-btn")) btn.title = "Upload to TikTok";
       if (btn.classList.contains("caption-btn")) btn.title = "Fill Caption";
       if (btn.classList.contains("product-id-btn")) btn.title = "Add Product";
       if (btn.classList.contains("ai-content-btn")) btn.title = "AI Content";
@@ -1321,18 +1492,53 @@ async function updateUploadButtonsStatus() {
       btn.title = "Please open TikTok upload page first";
     }
   });
+
+  // Handle upload buttons separately - they should always be enabled
+  const uploadButtons = document.querySelectorAll(".upload-btn");
+  uploadButtons.forEach((btn) => {
+    btn.disabled = false;
+    btn.style.opacity = "1";
+    btn.style.cursor = "pointer";
+    btn.style.filter = "none";
+    if (isOnUploadPage) {
+      btn.title = "Upload to TikTok";
+    } else {
+      btn.title = "Open TikTok upload page and upload video";
+    }
+  });
 }
 
 async function handleUploadClick(video) {
   console.log("Upload button clicked for video:", video.id);
 
+  // Check if user has premium plan
+  if (!checkPremiumFeatureAccess("Manual Post")) {
+    return;
+  }
+
   // Check if user is on TikTok upload page
   const isOnUploadPage = await checkUploadPageStatus();
 
   if (!isOnUploadPage) {
-    alert("Please open TikTok upload page first");
-    console.log("User not on TikTok upload page. Upload aborted.");
-    return;
+    // Open TikTok upload page for the user
+    console.log("Opening TikTok upload page...");
+
+    try {
+      await chrome.tabs.create({
+        url: "https://www.tiktok.com/upload",
+        active: true,
+      });
+
+      // Wait a moment for the page to start loading
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Now try to upload the video
+      console.log("TikTok upload page opened, attempting upload...");
+    } catch (error) {
+      console.error("Failed to open TikTok upload page:", error);
+      alert("Failed to open TikTok upload page. Please try again.");
+      return;
+    }
   }
 
   try {
@@ -1388,6 +1594,11 @@ async function handleUploadClick(video) {
 async function handleCaptionClick(caption, tooltip) {
   console.log("Caption button clicked:", caption);
 
+  // Check if user has premium plan
+  if (!checkPremiumFeatureAccess("Manual Post")) {
+    return;
+  }
+
   // 1. Copy caption to clipboard (keep existing functionality)
   try {
     await navigator.clipboard.writeText(caption);
@@ -1439,6 +1650,11 @@ async function handleCaptionClick(caption, tooltip) {
 
 async function handleProductIdClick(productId, tooltip, button) {
   console.log("Product ID button clicked:", productId);
+
+  // Check if user has premium plan
+  if (!checkPremiumFeatureAccess("Manual Post")) {
+    return;
+  }
 
   // 1. Copy product ID to clipboard (keep existing functionality)
   try {
@@ -1518,6 +1734,11 @@ async function handleProductIdClick(productId, tooltip, button) {
 async function handleAIContentClick(btn, tooltip) {
   console.log("AI Content button clicked");
 
+  // Check if user has premium plan
+  if (!checkPremiumFeatureAccess("Manual Post")) {
+    return;
+  }
+
   if (tooltip) {
     tooltip.textContent = "Enabling...";
     tooltip.style.color = "#3b82f6";
@@ -1596,6 +1817,11 @@ async function handleAIContentClick(btn, tooltip) {
 async function handlePostTiktokClick(btn) {
   console.log("Post Now button clicked");
 
+  // Check if user has premium plan
+  if (!checkPremiumFeatureAccess("Manual Post")) {
+    return;
+  }
+
   const isOnUploadPage = await checkUploadPageStatus();
   if (!isOnUploadPage) {
     alert("Please open TikTok upload page first");
@@ -1660,6 +1886,12 @@ async function handlePostTiktokClick(btn) {
 
 async function handleAutoPostClick(video, btn) {
   console.log("Auto Post button clicked for video:", video.id);
+
+  // Check if user has premium plan for auto-post feature
+  if (!checkPremiumFeatureAccess("Auto Post")) {
+    console.log("Auto Post feature requires premium plan");
+    return;
+  }
 
   const isOnUploadPage = await checkUploadPageStatus();
   if (!isOnUploadPage) {
@@ -2232,6 +2464,11 @@ function updatePostModeUI(mode) {
 async function handleSetScheduleClick(video, hourSelect, minuteSelect, btn) {
   console.log("Set Schedule button clicked for video:", video.id);
 
+  // Check if user has premium plan
+  if (!checkPremiumFeatureAccess("Manual Schedule")) {
+    return;
+  }
+
   const hour = hourSelect ? hourSelect.value : "";
   const minute = minuteSelect ? minuteSelect.value : "";
 
@@ -2510,6 +2747,12 @@ async function handleScheduleNowClick(video, hourSelect, minuteSelect, btn) {
 
 async function handleAutoScheduleClick(video, btn, hourSelect, minuteSelect) {
   console.log("Auto Schedule button clicked for video:", video.id);
+
+  // Check if user has premium plan for auto-schedule feature
+  if (!checkPremiumFeatureAccess("Auto Schedule")) {
+    console.log("Auto Schedule feature requires premium plan");
+    return;
+  }
 
   const hour = hourSelect ? hourSelect.value : "";
   const minute = minuteSelect ? minuteSelect.value : "";

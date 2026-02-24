@@ -124,6 +124,47 @@ body {
   white-space: nowrap;
 }
 
+.user-info .user-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.user-info .plan-info {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.plan-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  display: inline-block;
+}
+
+.plan-badge.premium {
+  background: linear-gradient(
+    90deg,
+    rgba(139, 92, 246, 0.2) 0%,
+    rgba(6, 182, 212, 0.2) 100%
+  );
+  color: #8b5cf6;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  box-shadow: 0 1px 3px rgba(139, 92, 246, 0.2);
+}
+
+.plan-badge.free {
+  background: rgba(148, 163, 184, 0.2);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
 /* Main Tabs (Video Type Tabs) */
 .video-type-tabs.main-tabs {
   display: flex;
