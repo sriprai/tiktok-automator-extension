@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TikTok Automator Sync Test</title>
+    <style>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+          sans-serif;
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        color: #f1f5f9;
+        margin: 0;
+        padding: 20px;
+        min-height: 100vh;
+      }
+
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        background: rgba(30, 41, 59, 0.8);
+        border-radius: 16px;
+        padding: 30px;
+        border: 1px solid #475569;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      }
+
+      h1 {
+        color: #8b5cf6;
+        text-align: center;
+        margin-bottom: 30px;
+        font-size: 28px;
+      }
+
+      .test-section {
+        background: rgba(15, 23, 42, 0.5);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+        border: 1px solid #475569;
+      }
+
+      .test-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+      }
+
+      .test-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #cbd5e1;
+      }
+
+      .test-status {
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+      }
+
+      .test-status.pending {
+        background: rgba(245, 158, 11, 0.2);
+        color: #f59e0b;
+      }
+
+      .test-status.passed {
+        background: rgba(34, 197, 94, 0.2);
+        color: #22c55e;
+      }
+
+      .test-status.failed {
+        background: rgba(239, 68, 68, 0.2);
+        color: #ef4444;
+      }
+
+      .test-log {
+        background: rgba(15, 23, 42, 0.8);
+        border-radius: 8px;
+        padding: 15px;
+        font-family: "Courier New", monospace;
+        font-size: 12px;
+        color: #94a3b8;
+        max-height: 200px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        word-break: break-all;
+        border: 1px solid #334155;
+      }
+
+      .controls {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        margin-top: 30px;
+      }
+
+      button {
+        padding: 12px 24px;
+        border-radius: 12px;
+        border: none;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .btn-primary {
+        background: linear-gradient(90deg, #8b5cf6 0%, #06b6d4 100%);
+        color: white;
+      }
+
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+      }
+
+      .btn-secondary {
+        background: rgba(30, 41, 59, 0.7);
+        color: #cbd5e1;
+        border: 1px solid #475569;
+      }
+
+      .btn-secondary:hover {
+        background: rgba(100, 116, 139, 0.3);
+        border-color: #64748b;
+      }
+
+      .summary {
+        text-align: center;
+        margin-top: 30px;
+        padding: 20px;
+        background: rgba(15, 23, 42, 0.5);
+        border-radius: 12px;
+        border: 1px solid #475569;
+      }
+
+      .summary h2 {
+        color: #f1f5f9;
+        margin-bottom: 10px;
+      }
+
+      .summary-result {
+        font-size: 24px;
+        font-weight: 700;
+        margin: 10px 0;
+      }
+
+      .summary-result.passed {
+        color: #22c55e;
+      }
+
+      .summary-result.failed {
+        color: #ef4444;
+      }
+
+      .debug-info {
+        margin-top: 20px;
+        padding: 15px;
+        background: rgba(15, 23, 42, 0.5);
+        border-radius: 8px;
+        border: 1px solid #475569;
+        font-size: 12px;
+        color: #94a3b8;
+      }
+
+      .debug-info h3 {
+        color: #cbd5e1;
+        margin-bottom: 10px;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🎯 TikTok Automator Sync User Test</h1>
+
+      <div class="test-section">
+        <div class="test-header">
+          <div class="test-title">Test 1: Debug Tools</div>
+          <div class="test-status pending" id="test1Status">Pending</div>
+        </div>
+        <div class="test-log" id="test1Log">Waiting for test...</div>
+      </div>
+
+      <div class="test-section">
+        <div class="test-header">
+          <div class="test-title">Test 2: Popup Functions</div>
+          <div class="test-status pending" id="test2Status">Pending</div>
+        </div>
+        <div class="test-log" id="test2Log">Waiting for test...</div>
+      </div>
+
+      <div class="test-section">
+        <div class="test-header">
+          <div class="test-title">Test 3: Chrome APIs</div>
+          <div class="test-status pending" id="test3Status">Pending</div>
+        </div>
+        <div class="test-log" id="test3Log">Waiting for test...</div>
+      </div>
+
+      <div class="test-section">
+        <div class="test-header">
+          <div class="test-title">Test 4: Storage Access</div>
+          <div class="test-status pending" id="test4Status">Pending</div>
+        </div>
+        <div class="test-log" id="test4Log">Waiting for test...</div>
+      </div>
+
+      <div class="test-section">
+        <div class="test-header">
+          <div class="test-title">Test 5: Cookie Access</div>
+          <div class="test-status pending" id="test5Status">Pending</div>
+        </div>
+        <div class="test-log" id="test5Log">Waiting for test...</div>
+      </div>
+
+      <div class="test-section">
+        <div class="test-header">
+          <div class="test-title">Test 6: Authentication Flow</div>
+          <div class="test-status pending" id="test6Status">Pending</div>
+        </div>
+        <div class="test-log" id="test6Log">Waiting for test...</div>
+      </div>
+
+      <div class="controls">
+        <button class="btn-primary" id="runTestsBtn">
+          <i class="fas fa-play"></i> Run All Tests
+        </button>
+        <button class="btn-secondary" id="clearLogsBtn">
+          <i class="fas fa-eraser"></i> Clear Logs
+        </button>
+      </div>
+
+      <div class="summary" id="summary" style="display: none">
+        <h2>Test Summary</h2>
+        <div class="summary-result" id="summaryResult">Loading...</div>
+        <div id="summaryDetails">Details will appear here...</div>
+      </div>
+
+      <div class="debug-info">
+        <h3>Debug Information</h3>
+        <div id="debugInfo">Loading debug info...</div>
+      </div>
+    </div>
+
+    <script src="test-sync.js"></script>
+    <script>
+      // Override console.log to capture logs
+      const originalConsoleLog = console.log;
+      const testLogs = {
+        test1: [],
+        test2: [],
+        test3: [],
+        test4: [],
+        test5: [],
+        test6: [],
+      };
+
+      console.log = function (...args) {
+        originalConsoleLog.apply(console, args);
+
+        // Capture logs for display
+        const message = args
+          .map((arg) =>
+            typeof arg === "object"
+              ? JSON.stringify(arg, null, 2)
+              : String(arg),
+          )
+          .join(" ");
+
+        // Determine which test this log belongs to
+        const logText = message.toLowerCase();
+        let testId = null;
+
+        if (
+          logText.includes("test 1") ||
+          logText.includes("checking debug tools")
+        ) {
+          testId = "test1";
+        } else if (
+          logText.includes("test 2") ||
+          logText.includes("checking popup functions")
+        ) {
+          testId = "test2";
+        } else if (
+          logText.includes("test 3") ||
+          logText.includes("checking chrome apis")
+        ) {
+          testId = "test3";
+        } else if (
+          logText.includes("test 4") ||
+          logText.includes("testing storage access")
+        ) {
+          testId = "test4";
+        } else if (
+          logText.includes("test 5") ||
+          logText.includes("testing cookie access")
+        ) {
+          testId = "test5";
+        } else if (
+          logText.includes("test 6") ||
+          logText.includes("testing authentication flow")
+        ) {
+          testId = "test6";
+        }
+
+        if (testId && testLogs[testId]) {
+          testLogs[testId].push(message);
+          updateTestLog(testId);
+        }
+      };
+
+      function updateTestLog(testId) {
+        const logElement = document.getElementById(`${testId}Log`);
+        if (logElement) {
+          logElement.textContent = testLogs[testId].join("\n");
+          logElement.scrollTop = logElement.scrollHeight;
+        }
+      }
+
+      function updateTestStatus(testId, passed) {
+        const statusElement = document.getElementById(`${testId}Status`);
+        if (statusElement) {
+          statusElement.textContent = passed ? "Passed" : "Failed";
+          statusElement.className = `test-status ${passed ? "passed" : "failed"}`;
+        }
+      }
+
+      async function runAllTests() {
+        console.log("=== Starting all tests ===");
+
+        // Reset all statuses
+        for (let i = 1; i <= 6; i++) {
+          const testId = `test${i}`;
+          testLogs[testId] = [];
+          updateTestStatus(testId, false);
+          updateTestLog(testId);
+        }
+
+        // Hide summary initially
+        document.getElementById("summary").style.display = "none";
+
+        try {
+          // Run tests through our test suite
+          if (typeof window.TikTokAutomatorTests !== "undefined") {
+            const results = await window.TikTokAutomatorTests.runAllTests();
+
+            // Update statuses based on results
+            const testMap = {
+              debugTools: "test1",
+              popupFunctions: "test2",
+              chromeAPIs: "test3",
+              storageAccess: "test4",
+              cookieAccess: "test5",
+              authFlow: "test6",
+            };
+
+            Object.entries(results).forEach(([testKey, passed]) => {
+              const testId = testMap[testKey];
+              if (testId) {
+                updateTestStatus(testId, passed);
+              }
+            });
+
+            // Show summary
+            const passedCount = Object.values(results).filter(Boolean).length;
+            const totalCount = Object.keys(results).length;
+            const allPassed = passedCount === totalCount;
+
+            document.getElementById("summary").style.display = "block";
+            document.getElementById("summaryResult").textContent =
+              `${passedCount}/${totalCount} Tests Passed`;
+            document.getElementById("summaryResult").className =
+              `summary-result ${allPassed ? "passed" : "failed"}`;
+            document.getElementById("summaryDetails").textContent = allPassed
+              ? "✅ All sync user fixes are working correctly!"
+              : "❌ Some tests failed. Check the logs above for details.";
+          } else {
+            console.error("Test suite not loaded");
+          }
+        } catch (error) {
+          console.error("Error running tests:", error);
+        }
+      }
+
+      function clearLogs() {
+        for (let i = 1; i <= 6; i++) {
+          const testId = `test${i}`;
+          testLogs[testId] = [];
+          updateTestLog(testId);
+          updateTestStatus(testId, false);
+        }
+
+        document.getElementById("summary").style.display = "none";
+        console.log("Logs cleared");
+      }
+
+      function updateDebugInfo() {
+        const debugInfo = document.getElementById("debugInfo");
+        const info = {
+          userAgent: navigator.userAgent,
+          platform: navigator.platform,
+          chrome: typeof chrome !== "undefined" ? "Available" : "Not available",
+          chromeRuntime:
+            typeof chrome !== "undefined" && chrome.runtime
+              ? "Available"
+              : "Not available",
+          chromeStorage:
+            typeof chrome !== "undefined" && chrome.storage
+              ? "Available"
+              : "Not available",
+          chromeTabs:
+            typeof chrome !== "undefined" && chrome.tabs
+              ? "Available"
+              : "Not available",
+          chromeCookies:
+            typeof chrome !== "undefined" && chrome.cookies
+              ? "Available"
+              : "Not available",
+          extensionId:
+            typeof chrome !== "undefined" && chrome.runtime
+              ? chrome.runtime.id
+              : "N/A",
+          testSuiteLoaded:
+            typeof window.TikTokAutomatorTests !== "undefined" ? "Yes" : "No",
+        };
+
+        debugInfo.innerHTML = Object.entries(info)
+          .map(([key, value]) => `<div><strong>${key}:</strong> ${value}</div>`)
+          .join("");
+      }
+
+      // Event listeners
+      document
+        .getElementById("runTestsBtn")
+        .addEventListener("click", runAllTests);
+      document
+        .getElementById("clearLogsBtn")
+        .addEventListener("click", clearLogs);
+
+      // Initialize
+      document.addEventListener("DOMContentLoaded", () => {
+        updateDebugInfo();
+        console.log("Test page loaded and ready");
+      });
+    </script>
+  </body>
+</html>

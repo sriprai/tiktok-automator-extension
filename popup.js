@@ -119,6 +119,11 @@ function setupEventListeners() {
     }
   });
 
+  // Manual login button
+  document.getElementById("manualLoginBtn").addEventListener("click", () => {
+    showManualLoginModal();
+  });
+
   // Logout button
   document.getElementById("logoutBtn").addEventListener("click", async () => {
     await logout();
@@ -170,6 +175,8 @@ function switchVideoType(videoType) {
 // Authentication
 async function checkAuth(forceRefresh = false) {
   try {
+    console.log(`Starting auth check (forceRefresh: ${forceRefresh})`);
+
     // If force refresh is requested, clear storage first
     if (forceRefresh) {
       await clearUserStorage();
@@ -182,54 +189,143 @@ async function checkAuth(forceRefresh = false) {
         currentUser = storedUser;
         updateUserUI();
         hideLoginContainer();
+        console.log("User loaded from storage:", currentUser.email);
         return true;
       }
     }
 
-    // Try to get user ID from web app via message
-    try {
-      const userId = await getUserIdFromWebApp();
-      if (userId) {
-        // Try to fetch user data with the user ID
-        const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
-          headers: {
-            "Content-Type": "application/json",
-            "x-user-id": userId.toString(),
-          },
-        });
+    // Try multiple methods to get user data
+    const authMethods = [
+      { name: "webAppMessage", func: getUserFromWebAppMessage },
+      { name: "webAppCookies", func: getUserFromWebAppCookies },
+      { name: "directApiWithCookies", func: getUserFromDirectApiWithCookies },
+    ];
 
-        if (response.ok) {
-          const data = await response.json();
-          currentUser = data.user;
+    for (const method of authMethods) {
+      try {
+        console.log(`Trying auth method: ${method.name}`);
+        const user = await method.func();
+        if (user) {
+          currentUser = user;
           await saveToStorage(STORAGE_KEYS.USER, currentUser);
           updateUserUI();
           hideLoginContainer();
+          console.log(`Auth successful via ${method.name}:`, user.email);
           return true;
         }
+      } catch (error) {
+        console.log(`Auth method ${method.name} failed:`, error.message);
       }
-    } catch (webAppError) {
-      console.log("Could not get user ID from web app:", webAppError);
     }
 
-    // Fallback: Try to fetch current user from API without auth
-    // This will likely fail but we try anyway
-    const response = await fetch(`${API_BASE_URL}/api/auth/me`);
-
-    if (response.ok) {
-      const data = await response.json();
-      currentUser = data.user;
-      await saveToStorage(STORAGE_KEYS.USER, currentUser);
-      updateUserUI();
-      hideLoginContainer();
-      return true;
-    } else {
-      showLoginContainer();
-      return false;
-    }
+    // All methods failed
+    console.log("All auth methods failed, showing login container");
+    showLoginContainer();
+    return false;
   } catch (error) {
     console.error("Auth check failed:", error);
     showLoginContainer();
     return false;
+  }
+}
+
+// Method 1: Get user from web app via message passing
+async function getUserFromWebAppMessage() {
+  try {
+    const userId = await getUserIdFromWebApp();
+    if (!userId) {
+      throw new Error("No user ID from web app");
+    }
+
+    // Try to fetch user data with the user ID
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/auth/me`);
+
+    if (response.ok) {
+      const data = await response.json();
+      return data.user;
+    } else {
+      throw new Error(`API response not OK: ${response.status}`);
+    }
+  } catch (error) {
+    throw new Error(`Web app message method failed: ${error.message}`);
+  }
+}
+
+// Method 2: Get user from web app cookies
+async function getUserFromWebAppCookies() {
+  return new Promise((resolve, reject) => {
+    // Get cookies from automatorx.co
+    chrome.cookies.getAll({ url: API_BASE_URL }, (cookies) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+
+      // Look for user-related cookies
+      const userCookies = cookies.filter(
+        (cookie) =>
+          cookie.name.includes("user") ||
+          cookie.name.includes("auth") ||
+          cookie.name.includes("session"),
+      );
+
+      if (userCookies.length === 0) {
+        reject(new Error("No user cookies found"));
+        return;
+      }
+
+      console.log(`Found ${userCookies.length} user cookies`);
+
+      // Try to extract user ID from cookies
+      let userId = null;
+      for (const cookie of userCookies) {
+        try {
+          // Check if cookie value is JSON
+          const parsed = JSON.parse(cookie.value);
+          if (parsed.id || parsed.userId) {
+            userId = parsed.id || parsed.userId;
+            break;
+          }
+        } catch {
+          // Not JSON, check if it's a simple ID
+          if (cookie.value.match(/^\d+$/)) {
+            userId = cookie.value;
+            break;
+          }
+        }
+      }
+
+      if (!userId) {
+        reject(new Error("Could not extract user ID from cookies"));
+        return;
+      }
+
+      // Fetch user data with the extracted ID
+      fetchWithAuth(`${API_BASE_URL}/api/auth/me`)
+        .then((response) => {
+          if (response.ok) {
+            return response.json();
+          } else {
+            throw new Error(`API response not OK: ${response.status}`);
+          }
+        })
+        .then((data) => resolve(data.user))
+        .catch(reject);
+    });
+  });
+}
+
+// Method 3: Direct API call with cookie-based authentication
+async function getUserFromDirectApiWithCookies() {
+  // This method tries to make a direct API call that might work
+  // if the user is logged into the web app in the same browser
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/auth/me`);
+
+  if (response.ok) {
+    const data = await response.json();
+    return data.user;
+  } else {
+    throw new Error(`Direct API failed: ${response.status}`);
   }
 }
 
@@ -1322,19 +1418,24 @@ async function fetchWithAuth(url, options = {}) {
     // Use chrome.runtime.sendMessage to communicate with background script
     // which can make the actual API call without CORS restrictions
     return new Promise((resolve, reject) => {
+      // Build headers safely
+      const headers = {
+        "Content-Type": "application/json",
+        ...options.headers,
+      };
+
+      // Only add x-user-id if currentUser exists and has an id
+      if (currentUser && currentUser.id) {
+        headers["x-user-id"] = currentUser.id.toString();
+      }
+
       chrome.runtime.sendMessage(
         {
           action: "FETCH_API",
           url: url,
           options: {
             ...options,
-            headers: {
-              "Content-Type": "application/json",
-              ...options.headers,
-              ...(currentUser?.id
-                ? { "x-user-id": currentUser.id.toString() }
-                : {}),
-            },
+            headers: headers,
           },
         },
         (response) => {
@@ -2992,6 +3093,750 @@ async function handleAutoScheduleClick(video, btn, hourSelect, minuteSelect) {
       btn.style.color = "";
       btn.disabled = false;
     }, 2000);
+  }
+}
+
+// Debug modal function
+function showDebugModal() {
+  // Create modal container
+  const modal = document.createElement("div");
+  modal.id = "debugModal";
+  modal.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    padding: 20px;
+  `;
+
+  // Create modal content
+  const modalContent = document.createElement("div");
+  modalContent.style.cssText = `
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-radius: 16px;
+    padding: 24px;
+    max-width: 800px;
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+    border: 1px solid #475569;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  `;
+
+  // Create header
+  const header = document.createElement("div");
+  header.style.cssText = `
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #475569;
+  `;
+
+  const title = document.createElement("h2");
+  title.textContent = "Token Sync Debug";
+  title.style.cssText = `
+    color: #f1f5f9;
+    font-size: 20px;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  `;
+  title.innerHTML = '<i class="fas fa-bug"></i> Token Sync Debug';
+
+  const closeBtn = document.createElement("button");
+  closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+  closeBtn.style.cssText = `
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    border-radius: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+  `;
+  closeBtn.addEventListener("mouseenter", () => {
+    closeBtn.style.background = "rgba(239, 68, 68, 0.3)";
+  });
+  closeBtn.addEventListener("mouseleave", () => {
+    closeBtn.style.background = "rgba(239, 68, 68, 0.2)";
+  });
+  closeBtn.addEventListener("click", () => {
+    document.body.removeChild(modal);
+  });
+
+  header.appendChild(title);
+  header.appendChild(closeBtn);
+
+  // Create debug info container
+  const debugInfo = document.createElement("div");
+  debugInfo.id = "debugInfoContent";
+  debugInfo.style.cssText = `
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 12px;
+    line-height: 1.4;
+  `;
+
+  // Create test buttons
+  const testButtons = document.createElement("div");
+  testButtons.style.cssText = `
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  `;
+
+  const tests = [
+    { id: "testStorageBtn", label: "Test Storage", icon: "fa-database" },
+    { id: "testCookiesBtn", label: "Test Cookies", icon: "fa-cookie" },
+    { id: "testWebAppBtn", label: "Test Web App", icon: "fa-globe" },
+    { id: "testAuthBtn", label: "Test Auth", icon: "fa-key" },
+    {
+      id: "clearStorageBtn",
+      label: "Clear Storage",
+      icon: "fa-trash",
+      warning: true,
+    },
+    {
+      id: "forceRefreshBtn",
+      label: "Force Refresh",
+      icon: "fa-redo",
+      warning: true,
+    },
+  ];
+
+  tests.forEach((test) => {
+    const btn = document.createElement("button");
+    btn.id = test.id;
+    btn.innerHTML = `<i class="fas ${test.icon}"></i> ${test.label}`;
+    btn.style.cssText = `
+      padding: 8px 12px;
+      background: ${test.warning ? "rgba(245, 158, 11, 0.2)" : "rgba(59, 130, 246, 0.2)"};
+      color: ${test.warning ? "#f59e0b" : "#3b82f6"};
+      border: 1px solid ${test.warning ? "rgba(245, 158, 11, 0.4)" : "rgba(59, 130, 246, 0.4)"};
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    `;
+    btn.addEventListener("mouseenter", () => {
+      btn.style.background = test.warning
+        ? "rgba(245, 158, 11, 0.3)"
+        : "rgba(59, 130, 246, 0.3)";
+    });
+    btn.addEventListener("mouseleave", () => {
+      btn.style.background = test.warning
+        ? "rgba(245, 158, 11, 0.2)"
+        : "rgba(59, 130, 246, 0.2)";
+    });
+    testButtons.appendChild(btn);
+  });
+
+  // Create results container
+  const results = document.createElement("div");
+  results.id = "debugResults";
+  results.style.cssText = `
+    background: rgba(15, 23, 42, 0.8);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 16px;
+    border: 1px solid #475569;
+    max-height: 300px;
+    overflow-y: auto;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 11px;
+  `;
+
+  // Assemble modal
+  modalContent.appendChild(header);
+  modalContent.appendChild(testButtons);
+  modalContent.appendChild(debugInfo);
+  modalContent.appendChild(results);
+  modal.appendChild(modalContent);
+  document.body.appendChild(modal);
+
+  // Load initial debug info
+  updateDebugInfo();
+
+  // Add event listeners for test buttons
+  document
+    .getElementById("testStorageBtn")
+    .addEventListener("click", testStorageDebug);
+  document
+    .getElementById("testCookiesBtn")
+    .addEventListener("click", testCookiesDebug);
+  document
+    .getElementById("testWebAppBtn")
+    .addEventListener("click", testWebAppDebug);
+  document
+    .getElementById("testAuthBtn")
+    .addEventListener("click", testAuthDebug);
+  document
+    .getElementById("clearStorageBtn")
+    .addEventListener("click", clearStorageDebug);
+  document
+    .getElementById("forceRefreshBtn")
+    .addEventListener("click", forceRefreshDebug);
+
+  // Close modal when clicking outside
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) {
+      document.body.removeChild(modal);
+    }
+  });
+}
+
+function updateDebugInfo() {
+  const debugInfo = document.getElementById("debugInfoContent");
+  if (!debugInfo) return;
+
+  let html = `
+    <div style="margin-bottom: 12px; color: #94a3b8; font-size: 11px;">
+      <strong>Current User:</strong> ${currentUser ? currentUser.email || currentUser.id || "Unknown" : "Not logged in"}
+    </div>
+    <div style="margin-bottom: 12px; color: #94a3b8; font-size: 11px;">
+      <strong>Chrome APIs:</strong> ${typeof chrome !== "undefined" ? "Available" : "Not available"}
+    </div>
+    <div style="margin-bottom: 12px; color: #94a3b8; font-size: 11px;">
+      <strong>Extension ID:</strong> ${chrome.runtime?.id || "Unknown"}
+    </div>
+    <div style="margin-bottom: 12px; color: #94a3b8; font-size: 11px;">
+      <strong>API Base URL:</strong> ${API_BASE_URL}
+    </div>
+  `;
+
+  debugInfo.innerHTML = html;
+}
+
+function addDebugResult(message, type = "info") {
+  const results = document.getElementById("debugResults");
+  if (!results) return;
+
+  const resultItem = document.createElement("div");
+  resultItem.style.cssText = `
+    padding: 6px 8px;
+    margin-bottom: 4px;
+    background: rgba(30, 41, 59, 0.5);
+    border-radius: 4px;
+    border-left: 3px solid ${type === "success" ? "#10b981" : type === "error" ? "#ef4444" : type === "warning" ? "#f59e0b" : "#3b82f6"};
+    color: ${type === "success" ? "#a7f3d0" : type === "error" ? "#fca5a5" : type === "warning" ? "#fde68a" : "#bfdbfe"};
+  `;
+
+  const timestamp = new Date().toLocaleTimeString();
+  resultItem.textContent = `[${timestamp}] ${message}`;
+
+  results.appendChild(resultItem);
+  results.scrollTop = results.scrollHeight;
+}
+
+async function testStorageDebug() {
+  addDebugResult("Testing Chrome storage...", "info");
+
+  try {
+    const result = await getFromStorage(STORAGE_KEYS.USER);
+    if (result) {
+      addDebugResult(
+        `✅ Found user in storage: ${result.email || result.id || "Unknown"}`,
+        "success",
+      );
+    } else {
+      addDebugResult("⚠️ No user found in storage", "warning");
+    }
+  } catch (error) {
+    addDebugResult(`❌ Storage test failed: ${error.message}`, "error");
+  }
+}
+
+async function testCookiesDebug() {
+  addDebugResult("Testing cookies...", "info");
+
+  try {
+    const cookies = await new Promise((resolve, reject) => {
+      chrome.cookies.getAll({ url: API_BASE_URL }, (cookies) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve(cookies);
+        }
+      });
+    });
+
+    addDebugResult(
+      `✅ Found ${cookies.length} cookies for ${API_BASE_URL}`,
+      "success",
+    );
+
+    const authCookies = cookies.filter(
+      (cookie) =>
+        cookie.name.includes("session") ||
+        cookie.name.includes("auth") ||
+        cookie.name.includes("token") ||
+        cookie.name.includes("user"),
+    );
+
+    if (authCookies.length > 0) {
+      addDebugResult(`✅ Found ${authCookies.length} auth cookies`, "success");
+      authCookies.forEach((cookie) => {
+        addDebugResult(
+          `   • ${cookie.name}: ${cookie.value.substring(0, 20)}...`,
+          "info",
+        );
+      });
+    } else {
+      addDebugResult("⚠️ No auth cookies found", "warning");
+      addDebugResult(
+        "💡 Please log into https://automatorx.co in this browser",
+        "info",
+      );
+      addDebugResult(
+        "💡 Make sure you're using the same browser profile",
+        "info",
+      );
+      addDebugResult(
+        "💡 Check if cookies are being blocked by browser settings",
+        "info",
+      );
+    }
+  } catch (error) {
+    addDebugResult(`❌ Cookies test failed: ${error.message}`, "error");
+  }
+}
+
+async function testWebAppDebug() {
+  addDebugResult("Testing web app connection...", "info");
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/auth/me`);
+
+    if (response.status === 401) {
+      addDebugResult(
+        "✅ Web app API is accessible (401 Unauthorized expected)",
+        "success",
+      );
+    } else if (response.ok) {
+      const data = await response.json();
+      addDebugResult(
+        `✅ Web app API is accessible. User: ${data.user?.email || data.user?.id || "Unknown"}`,
+        "success",
+      );
+    } else {
+      addDebugResult(
+        `⚠️ Web app API returned status: ${response.status}`,
+        "warning",
+      );
+    }
+  } catch (error) {
+    addDebugResult(`❌ Web app connection failed: ${error.message}`, "error");
+  }
+}
+
+async function testAuthDebug() {
+  addDebugResult("Testing authentication...", "info");
+
+  try {
+    const isAuthenticated = await checkAuth();
+    if (isAuthenticated) {
+      addDebugResult(
+        `✅ Authentication successful. User: ${currentUser?.email || currentUser?.id || "Unknown"}`,
+        "success",
+      );
+      updateDebugInfo();
+    } else {
+      addDebugResult("❌ Authentication failed", "error");
+    }
+  } catch (error) {
+    addDebugResult(`❌ Auth test failed: ${error.message}`, "error");
+  }
+}
+
+async function clearStorageDebug() {
+  addDebugResult("Clearing storage...", "warning");
+
+  try {
+    await clearUserStorage();
+    addDebugResult("✅ Storage cleared successfully", "success");
+    updateDebugInfo();
+  } catch (error) {
+    addDebugResult(`❌ Failed to clear storage: ${error.message}`, "error");
+  }
+}
+
+async function forceRefreshDebug() {
+  addDebugResult("Force refreshing authentication...", "warning");
+
+  try {
+    await clearUserStorage();
+    addDebugResult("✅ Storage cleared", "success");
+
+    const isAuthenticated = await checkAuth(true);
+    if (isAuthenticated) {
+      addDebugResult(
+        `✅ Force refresh successful. User: ${currentUser?.email || currentUser?.id || "Unknown"}`,
+        "success",
+      );
+      updateDebugInfo();
+    } else {
+      addDebugResult("❌ Force refresh failed", "error");
+    }
+  } catch (error) {
+    addDebugResult(`❌ Force refresh failed: ${error.message}`, "error");
+  }
+}
+
+// Manual login modal
+function showManualLoginModal() {
+  // Create modal container
+  const modal = document.createElement("div");
+  modal.id = "manualLoginModal";
+  modal.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    padding: 20px;
+  `;
+
+  // Create modal content
+  const modalContent = document.createElement("div");
+  modalContent.style.cssText = `
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-radius: 16px;
+    padding: 24px;
+    max-width: 400px;
+    width: 100%;
+    border: 1px solid #475569;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  `;
+
+  // Create header
+  const header = document.createElement("div");
+  header.style.cssText = `
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #475569;
+  `;
+
+  const title = document.createElement("h2");
+  title.textContent = "Manual Login";
+  title.style.cssText = `
+    color: #f1f5f9;
+    font-size: 20px;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  `;
+  title.innerHTML = '<i class="fas fa-key"></i> Manual Login';
+
+  const closeBtn = document.createElement("button");
+  closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+  closeBtn.style.cssText = `
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    border-radius: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+  `;
+  closeBtn.addEventListener("mouseenter", () => {
+    closeBtn.style.background = "rgba(239, 68, 68, 0.3)";
+  });
+  closeBtn.addEventListener("mouseleave", () => {
+    closeBtn.style.background = "rgba(239, 68, 68, 0.2)";
+  });
+  closeBtn.addEventListener("click", () => {
+    document.body.removeChild(modal);
+  });
+
+  header.appendChild(title);
+  header.appendChild(closeBtn);
+
+  // Create form
+  const form = document.createElement("form");
+  form.id = "manualLoginForm";
+  form.style.cssText = `
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  `;
+
+  // Email input
+  const emailGroup = document.createElement("div");
+  emailGroup.style.cssText = `
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  `;
+
+  const emailLabel = document.createElement("label");
+  emailLabel.textContent = "Email";
+  emailLabel.style.cssText = `
+    color: #94a3b8;
+    font-size: 14px;
+    font-weight: 500;
+  `;
+
+  const emailInput = document.createElement("input");
+  emailInput.type = "email";
+  emailInput.id = "manualLoginEmail";
+  emailInput.placeholder = "your@email.com";
+  emailInput.required = true;
+  emailInput.style.cssText = `
+    padding: 12px;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid #475569;
+    border-radius: 8px;
+    color: #f1f5f9;
+    font-size: 14px;
+    transition: all 0.2s;
+  `;
+  emailInput.addEventListener("focus", () => {
+    emailInput.style.borderColor = "#3b82f6";
+    emailInput.style.boxShadow = "0 0 0 2px rgba(59, 130, 246, 0.2)";
+  });
+  emailInput.addEventListener("blur", () => {
+    emailInput.style.borderColor = "#475569";
+    emailInput.style.boxShadow = "none";
+  });
+
+  emailGroup.appendChild(emailLabel);
+  emailGroup.appendChild(emailInput);
+
+  // Password input
+  const passwordGroup = document.createElement("div");
+  passwordGroup.style.cssText = `
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  `;
+
+  const passwordLabel = document.createElement("label");
+  passwordLabel.textContent = "Password";
+  passwordLabel.style.cssText = `
+    color: #94a3b8;
+    font-size: 14px;
+    font-weight: 500;
+  `;
+
+  const passwordInput = document.createElement("input");
+  passwordInput.type = "password";
+  passwordInput.id = "manualLoginPassword";
+  passwordInput.placeholder = "••••••••";
+  passwordInput.required = true;
+  passwordInput.style.cssText = `
+    padding: 12px;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid #475569;
+    border-radius: 8px;
+    color: #f1f5f9;
+    font-size: 14px;
+    transition: all 0.2s;
+  `;
+  passwordInput.addEventListener("focus", () => {
+    passwordInput.style.borderColor = "#3b82f6";
+    passwordInput.style.boxShadow = "0 0 0 2px rgba(59, 130, 246, 0.2)";
+  });
+  passwordInput.addEventListener("blur", () => {
+    passwordInput.style.borderColor = "#475569";
+    passwordInput.style.boxShadow = "none";
+  });
+
+  passwordGroup.appendChild(passwordLabel);
+  passwordGroup.appendChild(passwordInput);
+
+  // Submit button
+  const submitBtn = document.createElement("button");
+  submitBtn.type = "submit";
+  submitBtn.id = "manualLoginSubmit";
+  submitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
+  submitBtn.style.cssText = `
+    padding: 12px;
+    background: linear-gradient(90deg, #8b5cf6 0%, #06b6d4 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 8px;
+  `;
+  submitBtn.addEventListener("mouseenter", () => {
+    submitBtn.style.opacity = "0.9";
+  });
+  submitBtn.addEventListener("mouseleave", () => {
+    submitBtn.style.opacity = "1";
+  });
+
+  // Status message
+  const statusDiv = document.createElement("div");
+  statusDiv.id = "manualLoginStatus";
+  statusDiv.style.cssText = `
+    margin-top: 12px;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 14px;
+    text-align: center;
+    display: none;
+  `;
+
+  // Assemble form
+  form.appendChild(emailGroup);
+  form.appendChild(passwordGroup);
+  form.appendChild(submitBtn);
+
+  // Assemble modal
+  modalContent.appendChild(header);
+  modalContent.appendChild(form);
+  modalContent.appendChild(statusDiv);
+  modal.appendChild(modalContent);
+  document.body.appendChild(modal);
+
+  // Add form submit handler
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+
+    if (!email || !password) {
+      showManualLoginStatus("Please enter both email and password", "error");
+      return;
+    }
+
+    await handleManualLogin(email, password, submitBtn, statusDiv);
+  });
+
+  // Close modal when clicking outside
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) {
+      document.body.removeChild(modal);
+    }
+  });
+
+  // Focus email input
+  setTimeout(() => emailInput.focus(), 100);
+}
+
+function showManualLoginStatus(message, type = "info") {
+  const statusDiv = document.getElementById("manualLoginStatus");
+  if (!statusDiv) return;
+
+  statusDiv.textContent = message;
+  statusDiv.style.display = "block";
+
+  switch (type) {
+    case "success":
+      statusDiv.style.background = "rgba(34, 197, 94, 0.2)";
+      statusDiv.style.color = "#22c55e";
+      statusDiv.style.border = "1px solid rgba(34, 197, 94, 0.4)";
+      break;
+    case "error":
+      statusDiv.style.background = "rgba(239, 68, 68, 0.2)";
+      statusDiv.style.color = "#ef4444";
+      statusDiv.style.border = "1px solid rgba(239, 68, 68, 0.4)";
+      break;
+    case "warning":
+      statusDiv.style.background = "rgba(245, 158, 11, 0.2)";
+      statusDiv.style.color = "#f59e0b";
+      statusDiv.style.border = "1px solid rgba(245, 158, 11, 0.4)";
+      break;
+    default:
+      statusDiv.style.background = "rgba(59, 130, 246, 0.2)";
+      statusDiv.style.color = "#3b82f6";
+      statusDiv.style.border = "1px solid rgba(59, 130, 246, 0.4)";
+  }
+}
+
+async function handleManualLogin(email, password, submitBtn, statusDiv) {
+  const originalHTML = submitBtn.innerHTML;
+  submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging in...';
+  submitBtn.disabled = true;
+
+  showManualLoginStatus("Attempting to login...", "info");
+
+  try {
+    // Try to login via the API
+    const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: email,
+        password: password,
+      }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+
+      if (data.user) {
+        // Store user data
+        currentUser = data.user;
+        await saveToStorage(STORAGE_KEYS.USER, currentUser);
+
+        // Update UI
+        updateUserUI();
+        hideLoginContainer();
+
+        showManualLoginStatus(
+          "Login successful! Loading your data...",
+          "success",
+        );
+
+        // Load user data
+        await loadAllData();
+
+        // Close modal after success
+        setTimeout(() => {
+          const modal = document.getElementById("manualLoginModal");
+          if (modal) {
+            document.body.removeChild(modal);
+          }
+        }, 1500);
+      } else {
+        showManualLoginStatus("Login failed: No user data returned", "error");
+      }
+    } else {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage =
+        errorData.message || `Login failed with status ${response.status}`;
+      showManualLoginStatus(`Login failed: ${errorMessage}`, "error");
+    }
+  } catch (error) {
+    console.error("Manual login error:", error);
+    showManualLoginStatus(`Login error: ${error.message}`, "error");
+  } finally {
+    submitBtn.innerHTML = originalHTML;
+    submitBtn.disabled = false;
   }
 }
 

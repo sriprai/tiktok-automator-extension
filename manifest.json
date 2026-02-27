@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TikTok Video Automator",
-  "version": "1.0.3",
+  "version": "1.0.6",
   "description": "Chrome extension for TikTok Video Automator - View videos and products from your library",
   "permissions": [
     "storage",
