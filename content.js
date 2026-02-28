@@ -1015,14 +1015,15 @@ async function handleGenericEditor(editor, textToSet) {
 function cleanProductName(name) {
   if (!name) return "";
 
-  // 1. ลบเครื่องหมาย " และ ' ออก
-  let cleaned = name.replace(/["']/g, "");
+  // 1. Remove problematic special characters that might cause issues
+  // Remove: +, =, <, >, &, |, ^, %, $, #, @, !, ~, `, *, (, ), {, }, [, ], ", ', ;, :, \, /, ?
+  let cleaned = name.replace(/[+=<>&|^%$#@!~`*(){}\[\]"'\\;:/?]/g, "");
 
-  // 2. ลบเครื่องหมาย [ และ ] ออก (เพิ่มเติมตามคำแนะนำ)
-  cleaned = cleaned.replace(/[\[\]]/g, "");
+  // 2. Replace multiple spaces with single space
+  cleaned = cleaned.replace(/\s+/g, " ");
 
-  // 3. ตัดให้เหลือไม่เกิน 30 ตัวอักษร
-  cleaned = cleaned.substring(0, 30).trim();
+  // 3. Trim and limit to 30 characters
+  cleaned = cleaned.trim().substring(0, 30);
 
   return cleaned;
 }
