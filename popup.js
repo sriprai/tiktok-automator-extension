@@ -1583,17 +1583,29 @@ async function handleStartBulkPost() {
   );
   const selectedVideos = videos
     .filter((v) => selectedVideoIds.includes(v.id.toString()))
-    .map((v) => ({
-      id: v.id,
-      video_url: v.complete_video || v.video_url,
-      caption: v.tone || `${v.title} - ${v.price}`,
-      product_id: v.product_id,
-    }));
+    .map((v) => {
+      const videoCard = document
+        .querySelector(`.video-bulk-checkbox[data-video-id="${v.id}"]`)
+        .closest(".video-card");
+      const hour = videoCard.querySelector(".schedule-hour-select")?.value;
+      const minute = videoCard.querySelector(".schedule-minute-select")?.value;
+
+      return {
+        id: v.id,
+        video_url: v.complete_video || v.video_url,
+        caption: v.tone || `${v.title} - ${v.price}`,
+        product_id: v.product_id,
+        schedule_hour: hour,
+        schedule_minute: minute,
+        is_schedule: currentPostMode === "auto-schedule",
+      };
+    });
 
   await chrome.storage.local.set({
     isBulkProcessing: true,
     bulkQueue: selectedVideos,
     currentBulkIndex: 0,
+    bulkMode: currentPostMode,
   });
 
   // Update UI

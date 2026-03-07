@@ -227,6 +227,13 @@ async function handleTikTokBulkProcessing() {
   updateStep("Enabling AI content...");
   await toggleAIContent();
 
+  if (currentVideo.is_schedule && currentVideo.schedule_hour) {
+    updateStep(
+      `Setting schedule: ${currentVideo.schedule_hour}:${currentVideo.schedule_minute}`,
+    );
+    await setSchedule(currentVideo.schedule_hour, currentVideo.schedule_minute);
+  }
+
   updateStep("Waiting for Post button...");
 
   const checkPostButton = async () => {
@@ -241,7 +248,14 @@ async function handleTikTokBulkProcessing() {
         postButton.classList.contains("Button--disabled");
 
       if (!isDisabled) {
-        updateStep("Clicking Post button...");
+        const isScheduleMode = postButton.textContent
+          .toLowerCase()
+          .includes("schedule");
+        updateStep(
+          isScheduleMode
+            ? "Clicking Schedule button..."
+            : "Clicking Post button...",
+        );
         postButton.click();
 
         setTimeout(async () => {
@@ -252,12 +266,13 @@ async function handleTikTokBulkProcessing() {
             const confirmButtons = Array.from(
               modalConfirm.querySelectorAll("button"),
             );
-            const postNowBtn = confirmButtons.find((btn) =>
-              btn.textContent.toLowerCase().includes("post now"),
-            );
-            if (postNowBtn) {
-              updateStep("Confirming post...");
-              postNowBtn.click();
+            const confirmBtn = confirmButtons.find((btn) => {
+              const text = btn.textContent.toLowerCase();
+              return text.includes("post now") || text.includes("schedule now");
+            });
+            if (confirmBtn) {
+              updateStep("Confirming...");
+              confirmBtn.click();
             }
           }
 
