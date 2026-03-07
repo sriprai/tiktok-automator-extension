@@ -280,25 +280,46 @@ async function handleTikTokBulkProcessing() {
           try {
             const webhookUrl =
               "https://n8n.srv803794.hstgr.cloud/webhook/df76bbf9-ed7e-4f95-a62e-2495fe836c63";
+
+            // Determine status based on mode
+            let finalStatus = "Posted to Tiktok";
+            if (currentVideo.is_schedule) {
+              finalStatus = "Scheduled to Tiktok";
+            }
+
             const payload = {
               taskId: currentVideo.id,
-              status: currentVideo.is_schedule
-                ? "Scheduled to Tiktok"
-                : "Posted to Tiktok",
+              status: finalStatus,
               timestamp: new Date().toISOString(),
               url: window.location.href,
               detectionMethod: "bulk_auto_post",
             };
 
-            await chrome.runtime.sendMessage({
-              action: "FETCH_API",
-              url: webhookUrl,
-              options: {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
-              },
+            console.log("Sending status update webhook:", payload);
+
+            const response = await new Promise((resolve) => {
+              chrome.runtime.sendMessage(
+                {
+                  action: "FETCH_API",
+                  url: webhookUrl,
+                  options: {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                  },
+                },
+                (res) => resolve(res),
+              );
             });
+
+            if (response && response.ok) {
+              console.log("✅ Status update successful:", finalStatus);
+            } else {
+              console.error(
+                "❌ Status update failed:",
+                response?.error || "Unknown error",
+              );
+            }
           } catch (e) {
             console.error("Webhook failed", e);
           }
