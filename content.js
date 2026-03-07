@@ -297,28 +297,48 @@ async function handleTikTokBulkProcessing() {
 
             console.log("Sending status update webhook:", payload);
 
-            const response = await new Promise((resolve) => {
-              chrome.runtime.sendMessage(
-                {
-                  action: "FETCH_API",
-                  url: webhookUrl,
-                  options: {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload),
+            // Use fetch directly in content script if possible, or ensure background handles it
+            // Since we had issues with sendMessage, let's try direct fetch first
+            // If direct fetch fails due to CORS, we fall back to background but with more logging
+            try {
+              const directResponse = await fetch(webhookUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              });
+              if (directResponse.ok) {
+                console.log("✅ Direct status update successful:", finalStatus);
+              } else {
+                throw new Error("Direct fetch failed");
+              }
+            } catch (fetchErr) {
+              console.log("Direct fetch failed, trying background script...");
+              const response = await new Promise((resolve) => {
+                chrome.runtime.sendMessage(
+                  {
+                    action: "FETCH_API",
+                    url: webhookUrl,
+                    options: {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(payload),
+                    },
                   },
-                },
-                (res) => resolve(res),
-              );
-            });
+                  (res) => resolve(res),
+                );
+              });
 
-            if (response && response.ok) {
-              console.log("✅ Status update successful:", finalStatus);
-            } else {
-              console.error(
-                "❌ Status update failed:",
-                response?.error || "Unknown error",
-              );
+              if (response && response.ok) {
+                console.log(
+                  "✅ Background status update successful:",
+                  finalStatus,
+                );
+              } else {
+                console.error(
+                  "❌ Background status update failed:",
+                  response?.error || "Unknown error",
+                );
+              }
             }
           } catch (e) {
             console.error("Webhook failed", e);
