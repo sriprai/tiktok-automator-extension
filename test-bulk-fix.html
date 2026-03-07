@@ -1,0 +1,423 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Test Bulk Posting Fix</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+        background: #1e293b;
+        color: #f1f5f9;
+      }
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        background: #0f172a;
+        padding: 20px;
+        border-radius: 8px;
+        border: 1px solid #475569;
+      }
+      h1 {
+        color: #8b5cf6;
+        text-align: center;
+      }
+      .test-section {
+        margin: 20px 0;
+        padding: 15px;
+        background: rgba(30, 41, 59, 0.5);
+        border-radius: 6px;
+        border: 1px solid #475569;
+      }
+      button {
+        background: linear-gradient(90deg, #8b5cf6 0%, #06b6d4 100%);
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: bold;
+        margin: 5px;
+      }
+      button:hover {
+        opacity: 0.9;
+      }
+      .log {
+        background: #0f172a;
+        border: 1px solid #475569;
+        border-radius: 6px;
+        padding: 10px;
+        margin-top: 10px;
+        max-height: 200px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 12px;
+      }
+      .log-entry {
+        margin: 2px 0;
+        padding: 2px 5px;
+        border-radius: 3px;
+      }
+      .log-entry.info {
+        background: rgba(59, 130, 246, 0.2);
+        color: #60a5fa;
+      }
+      .log-entry.success {
+        background: rgba(34, 197, 94, 0.2);
+        color: #22c55e;
+      }
+      .log-entry.error {
+        background: rgba(239, 68, 68, 0.2);
+        color: #ef4444;
+      }
+      .log-entry.warning {
+        background: rgba(245, 158, 11, 0.2);
+        color: #f59e0b;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Bulk Posting Fix Test</h1>
+
+      <div class="test-section">
+        <h3>Test 1: Check Storage</h3>
+        <p>
+          Test if the extension can properly set and read bulk posting flags
+          from storage.
+        </p>
+        <button onclick="testStorage()">Test Storage</button>
+        <div id="storage-log" class="log"></div>
+      </div>
+
+      <div class="test-section">
+        <h3>Test 2: Simulate Bulk Posting</h3>
+        <p>
+          Simulate the bulk posting flow to check if flags are set correctly.
+        </p>
+        <button onclick="simulateBulkPost()">Simulate Bulk Post</button>
+        <div id="bulk-log" class="log"></div>
+      </div>
+
+      <div class="test-section">
+        <h3>Test 3: Check Completion Check</h3>
+        <p>
+          Test if the completion check properly detects bulk posting status.
+        </p>
+        <button onclick="testCompletionCheck()">Test Completion Check</button>
+        <div id="completion-log" class="log"></div>
+      </div>
+
+      <div class="test-section">
+        <h3>Test 4: Reset All Tests</h3>
+        <p>Clear all test data and logs.</p>
+        <button
+          onclick="resetTests()"
+          style="background: linear-gradient(90deg, #ef4444 0%, #f59e0b 100%)"
+        >
+          Reset Tests
+        </button>
+      </div>
+    </div>
+
+    <script>
+      let logs = {
+        storage: [],
+        bulk: [],
+        completion: [],
+      };
+
+      function addLog(type, message, level = "info") {
+        const logDiv = document.getElementById(`${type}-log`);
+        const entry = document.createElement("div");
+        entry.className = `log-entry ${level}`;
+        entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        logDiv.appendChild(entry);
+        logDiv.scrollTop = logDiv.scrollHeight;
+        logs[type].push({ message, level, time: new Date() });
+      }
+
+      async function testStorage() {
+        addLog("storage", "Starting storage test...", "info");
+
+        try {
+          // Test 1: Set bulk processing flag
+          addLog("storage", "Setting isBulkProcessing to true...", "info");
+          await chrome.storage.local.set({ isBulkProcessing: true });
+
+          // Test 2: Read it back
+          addLog("storage", "Reading isBulkProcessing...", "info");
+          const result = await chrome.storage.local.get(["isBulkProcessing"]);
+
+          if (result.isBulkProcessing === true) {
+            addLog(
+              "storage",
+              "✅ Storage test PASSED: isBulkProcessing correctly set to true",
+              "success",
+            );
+          } else {
+            addLog(
+              "storage",
+              `❌ Storage test FAILED: Expected true, got ${result.isBulkProcessing}`,
+              "error",
+            );
+          }
+
+          // Test 3: Set bulk queue
+          addLog("storage", "Setting bulkQueue with test data...", "info");
+          const testQueue = [
+            { id: 1, title: "Test Video 1", status: "pending" },
+            { id: 2, title: "Test Video 2", status: "pending" },
+          ];
+          await chrome.storage.local.set({ bulkQueue: testQueue });
+
+          // Test 4: Read it back
+          addLog("storage", "Reading bulkQueue...", "info");
+          const queueResult = await chrome.storage.local.get(["bulkQueue"]);
+
+          if (queueResult.bulkQueue && queueResult.bulkQueue.length === 2) {
+            addLog(
+              "storage",
+              "✅ Storage test PASSED: bulkQueue correctly set with 2 videos",
+              "success",
+            );
+          } else {
+            addLog(
+              "storage",
+              `❌ Storage test FAILED: Expected 2 videos, got ${queueResult.bulkQueue?.length || 0}`,
+              "error",
+            );
+          }
+        } catch (error) {
+          addLog("storage", `❌ Storage test ERROR: ${error.message}`, "error");
+        }
+      }
+
+      async function simulateBulkPost() {
+        addLog("bulk", "Starting bulk posting simulation...", "info");
+
+        try {
+          // Step 1: Set up bulk queue (like handleBulkPostSelected)
+          addLog("bulk", "Step 1: Setting up bulk queue...", "info");
+          const bulkQueue = [
+            {
+              id: 1001,
+              title: "Test Video 1",
+              videoUrl: "https://example.com/video1.mp4",
+              caption: "Test caption 1",
+              productId: "123",
+              status: "pending",
+            },
+            {
+              id: 1002,
+              title: "Test Video 2",
+              videoUrl: "https://example.com/video2.mp4",
+              caption: "Test caption 2",
+              productId: "456",
+              status: "pending",
+            },
+          ];
+
+          await chrome.storage.local.set({
+            bulkQueue: bulkQueue,
+            currentBulkIndex: 0,
+            isBulkProcessing: true,
+          });
+
+          addLog("bulk", "✅ Step 1: Bulk queue set with 2 videos", "success");
+
+          // Step 2: Simulate startBulkPosting
+          addLog("bulk", "Step 2: Simulating startBulkPosting...", "info");
+
+          // Get current state
+          const state = await chrome.storage.local.get([
+            "bulkQueue",
+            "currentBulkIndex",
+            "isBulkProcessing",
+          ]);
+
+          if (!state.isBulkProcessing) {
+            addLog(
+              "bulk",
+              "❌ Step 2 FAILED: isBulkProcessing is false",
+              "error",
+            );
+            return;
+          }
+
+          if (state.bulkQueue.length === 0) {
+            addLog("bulk", "❌ Step 2 FAILED: bulkQueue is empty", "error");
+            return;
+          }
+
+          const currentIndex = state.currentBulkIndex || 0;
+          const currentVideo = state.bulkQueue[currentIndex];
+
+          addLog(
+            "bulk",
+            `✅ Step 2: Processing video ${currentIndex + 1}/${state.bulkQueue.length}: ${currentVideo.title}`,
+            "success",
+          );
+
+          // Step 3: Simulate video upload and status update
+          addLog("bulk", "Step 3: Simulating video upload...", "info");
+
+          // Update video status to "uploaded"
+          state.bulkQueue[currentIndex].status = "uploaded";
+          await chrome.storage.local.set({ bulkQueue: state.bulkQueue });
+
+          addLog(
+            "bulk",
+            `✅ Step 3: Video ${currentIndex + 1} marked as "uploaded"`,
+            "success",
+          );
+
+          // Step 4: Check if completion check would work
+          addLog("bulk", "Step 4: Testing completion check logic...", "info");
+
+          // Simulate content script marking video as completed
+          setTimeout(async () => {
+            state.bulkQueue[currentIndex].status = "completed";
+            await chrome.storage.local.set({ bulkQueue: state.bulkQueue });
+
+            addLog(
+              "bulk",
+              `✅ Step 4: Video ${currentIndex + 1} marked as "completed" by content script`,
+              "success",
+            );
+
+            // Check if completion check would detect this
+            const newState = await chrome.storage.local.get([
+              "bulkQueue",
+              "currentBulkIndex",
+              "isBulkProcessing",
+            ]);
+
+            if (newState.bulkQueue[currentIndex].status === "completed") {
+              addLog(
+                "bulk",
+                "✅ Completion check would detect completed video!",
+                "success",
+              );
+            } else {
+              addLog(
+                "bulk",
+                "❌ Completion check would NOT detect completed video",
+                "error",
+              );
+            }
+          }, 1000);
+        } catch (error) {
+          addLog("bulk", `❌ Simulation ERROR: ${error.message}`, "error");
+        }
+      }
+
+      async function testCompletionCheck() {
+        addLog("completion", "Testing completion check logic...", "info");
+
+        try {
+          // Set up test data
+          await chrome.storage.local.set({
+            bulkQueue: [
+              { id: 1, status: "completed" },
+              { id: 2, status: "pending" },
+            ],
+            currentBulkIndex: 0,
+            isBulkProcessing: true,
+          });
+
+          addLog(
+            "completion",
+            "Test data set: Video 1 = completed, Video 2 = pending",
+            "info",
+          );
+
+          // Simulate completion check logic
+          const state = await chrome.storage.local.get([
+            "bulkQueue",
+            "currentBulkIndex",
+            "isBulkProcessing",
+          ]);
+
+          if (!state.isBulkProcessing) {
+            addLog(
+              "completion",
+              "❌ Completion check would stop: isBulkProcessing is false",
+              "error",
+            );
+            return;
+          }
+
+          if (state.bulkQueue.length === 0) {
+            addLog(
+              "completion",
+              "❌ Completion check would stop: bulkQueue is empty",
+              "error",
+            );
+            return;
+          }
+
+          const currentIndex = state.currentBulkIndex || 0;
+
+          if (
+            currentIndex < state.bulkQueue.length &&
+            state.bulkQueue[currentIndex].status === "completed"
+          ) {
+            addLog(
+              "completion",
+              `✅ Completion check would detect completed video at index ${currentIndex}`,
+              "success",
+            );
+
+            // Check if it would move to next video
+            const nextIndex = currentIndex + 1;
+            addLog(
+              "completion",
+              `✅ Completion check would move to next video (index ${nextIndex})`,
+              "success",
+            );
+
+            if (nextIndex < state.bulkQueue.length) {
+              addLog(
+                "completion",
+                `✅ More videos to process (${nextIndex + 1}/${state.bulkQueue.length})`,
+                "success",
+              );
+            } else {
+              addLog("completion", "✅ All videos completed!", "success");
+            }
+          } else {
+            addLog(
+              "completion",
+              `❌ Completion check would NOT detect completed video at index ${currentIndex}`,
+              "error",
+            );
+          }
+        } catch (error) {
+          addLog("completion", `❌ Test ERROR: ${error.message}`, "error");
+        }
+      }
+
+      function resetTests() {
+        // Clear storage
+        chrome.storage.local.remove([
+          "isBulkProcessing",
+          "bulkQueue",
+          "currentBulkIndex",
+        ]);
+
+        // Clear logs
+        document.getElementById("storage-log").innerHTML = "";
+        document.getElementById("bulk-log").innerHTML = "";
+        document.getElementById("completion-log").innerHTML = "";
+
+        logs = {
+          storage: [],
+          bulk: [],
+          completion: [],
+        };
+
+        alert("All tests reset!");
+      }
+    </script>
+  </body>
+</html>

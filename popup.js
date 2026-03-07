@@ -2,7 +2,7 @@
 // Main popup functionality
 
 // Configuration
-const API_BASE_URL = "https://automatorx.co"; // Change to your production URL
+const API_BASE_URL = "https://www.automatorx.co"; // Change to your production URL
 const STORAGE_KEYS = {
   USER: "tiktok_automator_user",
   TOKEN: "tiktok_automator_token",
@@ -157,6 +157,25 @@ function setupEventListeners() {
 
   // Post mode toggle buttons
   setupPostModeToggleListeners();
+
+  // Bulk controls
+  const selectAllVideos = document.getElementById("selectAllVideos");
+  if (selectAllVideos) {
+    selectAllVideos.addEventListener("change", (e) => {
+      const checkboxes = document.querySelectorAll(".video-bulk-checkbox");
+      checkboxes.forEach((cb) => (cb.checked = e.target.checked));
+    });
+  }
+
+  const startBulkPostBtn = document.getElementById("startBulkPost");
+  if (startBulkPostBtn) {
+    startBulkPostBtn.addEventListener("click", handleStartBulkPost);
+  }
+
+  const stopBulkPostBtn = document.getElementById("stopBulkPost");
+  if (stopBulkPostBtn) {
+    stopBulkPostBtn.addEventListener("click", handleStopBulkPost);
+  }
 }
 
 // Video Type Management
@@ -691,6 +710,18 @@ function renderVideos() {
     const videoCard = createVideoCard(video);
     videosGridEl.appendChild(videoCard);
   });
+
+  // Update checkbox visibility based on current mode
+  updateCheckboxVisibility();
+}
+
+function updateCheckboxVisibility() {
+  const checkboxes = document.querySelectorAll(".video-checkbox-container");
+  const isBulkMode =
+    currentPostMode === "auto-post" || currentPostMode === "auto-schedule";
+  checkboxes.forEach((cb) => {
+    cb.style.display = isBulkMode ? "flex" : "none";
+  });
 }
 
 function createVideoCard(video) {
@@ -932,6 +963,9 @@ function createVideoCard(video) {
   }
 
   card.innerHTML = `
+        <div class="video-checkbox-container">
+          <input type="checkbox" class="video-bulk-checkbox" data-video-id="${video.id}" />
+        </div>
         <div class="video-thumbnail">
             <img src="${thumbnailUrl}" alt="${video.title || "Video"}">
             ${isPlayable ? '<div class="play-icon-overlay"><i class="fas fa-play-circle"></i></div>' : ""}
@@ -951,8 +985,11 @@ function createVideoCard(video) {
 
   // Add click event for video card (for video playback)
   card.addEventListener("click", (e) => {
-    // Don't trigger if clicking on action buttons
-    if (e.target.closest(".video-actions")) {
+    // Don't trigger if clicking on action buttons or checkbox
+    if (
+      e.target.closest(".video-actions") ||
+      e.target.closest(".video-checkbox-container")
+    ) {
       return;
     }
 
@@ -1165,6 +1202,31 @@ function hideLoading(section) {
 
   if (loadingEl) loadingEl.style.display = "none";
   if (contentEl) contentEl.style.display = "grid" || "table" || "block";
+
+  // Show bulk controls if we are in auto-post mode and have videos
+  if (section === "videos") {
+    updateBulkControlsVisibility();
+    updateCheckboxVisibility();
+  }
+}
+
+function updateBulkControlsVisibility() {
+  const bulkControls = document.getElementById("bulkControls");
+  if (bulkControls) {
+    const isBulkMode =
+      currentPostMode === "auto-post" || currentPostMode === "auto-schedule";
+    const hasVideos = videos.length > 0;
+    bulkControls.style.display = isBulkMode && hasVideos ? "flex" : "none";
+
+    // Check if bulk processing is active
+    chrome.storage.local.get(["isBulkProcessing"], (result) => {
+      const isBulkProcessing = result.isBulkProcessing || false;
+      const startBtn = document.getElementById("startBulkPost");
+      const stopBtn = document.getElementById("stopBulkPost");
+      if (startBtn) startBtn.style.display = isBulkProcessing ? "none" : "flex";
+      if (stopBtn) stopBtn.style.display = isBulkProcessing ? "flex" : "none";
+    });
+  }
 }
 
 function showEmptyState(section, message = "No data found") {
@@ -1505,6 +1567,72 @@ async function sendWebhookEvent(eventType, videoId, buttonType) {
   } catch (error) {
     console.error("Error in sendWebhookEvent:", error);
   }
+}
+
+async function handleStartBulkPost() {
+  const selectedCheckboxes = document.querySelectorAll(
+    ".video-bulk-checkbox:checked",
+  );
+  if (selectedCheckboxes.length === 0) {
+    alert("Please select at least one video to post.");
+    return;
+  }
+
+  const selectedVideoIds = Array.from(selectedCheckboxes).map(
+    (cb) => cb.dataset.videoId,
+  );
+  const selectedVideos = videos
+    .filter((v) => selectedVideoIds.includes(v.id.toString()))
+    .map((v) => ({
+      id: v.id,
+      video_url: v.complete_video || v.video_url,
+      caption: v.tone || `${v.title} - ${v.price}`,
+      product_id: v.product_id,
+    }));
+
+  await chrome.storage.local.set({
+    isBulkProcessing: true,
+    bulkQueue: selectedVideos,
+    currentBulkIndex: 0,
+  });
+
+  // Update UI
+  updateBulkControlsVisibility();
+
+  // Open TikTok upload page immediately for the first video
+  const firstVideo = selectedVideos[0];
+
+  // Use the existing handleAutoPostClick logic to ensure all steps are followed
+  // We need to find the video object from the 'videos' array to pass to handleAutoPostClick
+  const videoObj = videos.find(
+    (v) => v.id.toString() === firstVideo.id.toString(),
+  );
+  if (videoObj) {
+    // We need a button element for handleAutoPostClick, but since we are starting bulk,
+    // we can just trigger the background message directly or mock the button.
+    // To follow "all steps of auto post method", let's use the background message
+    // but ensure it's consistent with what handleAutoPostClick does.
+
+    chrome.runtime.sendMessage({
+      action: "OPEN_UPLOAD_PAGE",
+      data: {
+        id: videoObj.id,
+        video_url: videoObj.complete_video || videoObj.video_url,
+        caption: videoObj.tone || `${videoObj.title} - ${videoObj.price}`,
+        product_id: videoObj.product_id,
+      },
+    });
+  }
+}
+
+async function handleStopBulkPost() {
+  await chrome.storage.local.set({
+    isBulkProcessing: false,
+    bulkQueue: [],
+    currentBulkIndex: 0,
+  });
+  updateBulkControlsVisibility();
+  alert("Bulk posting stopped.");
 }
 
 // Background communication
@@ -2514,6 +2642,10 @@ function setPostMode(mode) {
   if (videos.length > 0) {
     renderVideos();
   }
+
+  // Update bulk controls and checkbox visibility
+  updateBulkControlsVisibility();
+  updateCheckboxVisibility();
 }
 
 function updatePostModeUI(mode) {

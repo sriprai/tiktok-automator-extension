@@ -259,9 +259,52 @@ function injectAuthHelper() {
 
 // Run on page load
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", injectAuthHelper);
+  document.addEventListener("DOMContentLoaded", () => {
+    injectAuthHelper();
+    handleBulkProcessing();
+  });
 } else {
   injectAuthHelper();
+  handleBulkProcessing();
+}
+
+async function handleBulkProcessing() {
+  const result = await chrome.storage.local.get([
+    "isBulkProcessing",
+    "bulkQueue",
+    "currentBulkIndex",
+  ]);
+
+  if (result.isBulkProcessing && result.bulkQueue) {
+    const index = result.currentBulkIndex || 0;
+    const queue = result.bulkQueue;
+
+    if (index >= queue.length) {
+      await chrome.storage.local.set({ isBulkProcessing: false });
+      alert("Bulk Posting Completed!");
+      return;
+    }
+
+    console.log(`Bulk processing: video ${index + 1} of ${queue.length}`);
+
+    // Wait 5 seconds for the video library to render
+    setTimeout(async () => {
+      const videoData = queue[index];
+      console.log("Triggering auto post for:", videoData);
+
+      // We need to find the "AUTO POST" button for this video or trigger the logic directly
+      // Since we have the data, we can just navigate to the upload page with the data
+      // But the requirement says "Programmatically trigger the 'AUTO POST' logic"
+      // In popup.js, handleAutoPostClick opens the upload page and then sends a message.
+      // Here we are in a content script, we can't easily call popup functions.
+      // We should redirect to TikTok upload page and let content.js take over.
+
+      chrome.runtime.sendMessage({
+        action: "OPEN_UPLOAD_PAGE",
+        data: videoData,
+      });
+    }, 5000);
+  }
 }
 
 // Also inject when page changes (for SPAs)

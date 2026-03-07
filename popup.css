@@ -226,7 +226,14 @@ body {
   color: #f1f5f9;
 }
 
-.controls {
+.controls-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.controls-row {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1284,6 +1291,76 @@ body {
 }
 
 /* Footer */
+/* Bulk Controls */
+.bulk-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-right: auto;
+}
+
+.select-all-label {
+  font-size: 11px;
+  color: #cbd5e1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.btn-bulk {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: none;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  background: linear-gradient(90deg, #8b5cf6 0%, #06b6d4 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.btn-bulk:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.btn-bulk.btn-stop {
+  background: linear-gradient(90deg, #ef4444 0%, #f87171 100%);
+}
+
+.btn-bulk.btn-stop:hover {
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+/* Video Card Checkbox */
+.video-card {
+  position: relative;
+}
+
+.video-checkbox-container {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 5;
+  background: rgba(15, 23, 42, 0.8);
+  border-radius: 4px;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.video-bulk-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
 .footer {
   margin-top: 20px;
   padding-top: 16px;

@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bulk Auto-Post Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+        background: #f5f5f5;
+      }
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #333;
+        text-align: center;
+      }
+      .video-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 15px;
+        margin: 20px 0;
+      }
+      .video-card {
+        border: 1px solid #ddd;
+        padding: 15px;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .video-card.selected {
+        border-color: #007bff;
+        background: #e7f3ff;
+      }
+      .video-card input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+      }
+      .video-card label {
+        cursor: pointer;
+        flex: 1;
+      }
+      .controls {
+        display: flex;
+        gap: 10px;
+        margin: 20px 0;
+        flex-wrap: wrap;
+      }
+      button {
+        padding: 10px 20px;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+      button.danger {
+        background: #dc3545;
+      }
+      .status {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        margin: 20px 0;
+      }
+      .log {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        max-height: 200px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 12px;
+      }
+      .countdown {
+        font-size: 24px;
+        font-weight: bold;
+        text-align: center;
+        color: #28a745;
+        margin: 10px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Bulk Auto-Post Test</h1>
+      <p>
+        Test the bulk auto-post functionality with random delays (1-5 minutes)
+        between posts.
+      </p>
+
+      <div class="video-grid" id="videoGrid"></div>
+
+      <div class="controls">
+        <button id="selectAllBtn">Select All</button>
+        <button id="clearSelectionBtn">Clear All</button>
+        <button id="startBulkTestBtn">Start Bulk Test</button>
+        <button id="cancelBulkTestBtn" class="danger" disabled>
+          Cancel Test
+        </button>
+      </div>
+
+      <div class="status">
+        <div><strong>Status:</strong> <span id="testStatus">Ready</span></div>
+        <div>
+          <strong>Selected Videos:</strong> <span id="selectedCount">0</span>
+        </div>
+        <div><strong>Progress:</strong> <span id="progressText">0/0</span></div>
+        <div>
+          <strong>Next Post In:</strong> <span id="countdownText">--:--</span>
+        </div>
+      </div>
+
+      <div class="countdown" id="countdownDisplay" style="display: none"></div>
+
+      <div class="log" id="logContainer">
+        <div>[09:07:33] Test environment initialized</div>
+      </div>
+    </div>
+
+    <script>
+      const testVideos = [
+        { id: 1, title: "Product Showcase #1" },
+        { id: 2, title: "Viral Video Tutorial" },
+        { id: 3, title: "Product Demo" },
+        { id: 4, title: "Trending Challenge" },
+        { id: 5, title: "Unboxing Video" },
+        { id: 6, title: "How-to Guide" },
+      ];
+
+      let selectedVideos = new Set();
+      let bulkTestInProgress = false;
+      let currentTestVideoIndex = 0;
+      let testQueue = [];
+      let countdownInterval = null;
+      let currentCountdown = 0;
+      let testTimer = null;
+
+      const videoGrid = document.getElementById("videoGrid");
+      const selectAllBtn = document.getElementById("selectAllBtn");
+      const clearSelectionBtn = document.getElementById("clearSelectionBtn");
+      const startBulkTestBtn = document.getElementById("startBulkTestBtn");
+      const cancelBulkTestBtn = document.getElementById("cancelBulkTestBtn");
+      const testStatus = document.getElementById("testStatus");
+      const selectedCount = document.getElementById("selectedCount");
+      const progressText = document.getElementById("progressText");
+      const countdownText = document.getElementById("countdownText");
+      const countdownDisplay = document.getElementById("countdownDisplay");
+      const logContainer = document.getElementById("logContainer");
+
+      function init() {
+        renderVideoGrid();
+        updateUI();
+        addLog("Test environment initialized");
+      }
+
+      function renderVideoGrid() {
+        videoGrid.innerHTML = "";
+        testVideos.forEach((video) => {
+          const card = document.createElement("div");
+          card.className = `video-card ${selectedVideos.has(video.id) ? "selected" : ""}`;
+
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.id = `video-${video.id}`;
+          checkbox.checked = selectedVideos.has(video.id);
+
+          const label = document.createElement("label");
+          label.htmlFor = `video-${video.id}`;
+          label.textContent = video.title;
+
+          card.appendChild(checkbox);
+          card.appendChild(label);
+
+          checkbox.addEventListener("change", (e) => {
+            if (checkbox.checked) {
+              selectedVideos.add(video.id);
+            } else {
+              selectedVideos.delete(video.id);
+            }
+            card.classList.toggle("selected", checkbox.checked);
+            updateUI();
+          });
+
+          videoGrid.appendChild(card);
+        });
+      }
+
+      function updateUI() {
+        selectedCount.textContent = selectedVideos.size;
+        startBulkTestBtn.disabled =
+          selectedVideos.size === 0 || bulkTestInProgress;
+        cancelBulkTestBtn.disabled = !bulkTestInProgress;
+        testStatus.textContent = bulkTestInProgress ? "In Progress" : "Ready";
+      }
+
+      function addLog(message) {
+        const now = new Date();
+        const time = `[${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}]`;
+        const logEntry = document.createElement("div");
+        logEntry.textContent = `${time} ${message}`;
+        logContainer.appendChild(logEntry);
+        logContainer.scrollTop = logContainer.scrollHeight;
+      }
+
+      function updateCountdown(seconds) {
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        const timeString = `${minutes.toString().padStart(2, "0")}:${remainingSeconds.toString().padStart(2, "0")}`;
+        countdownText.textContent = timeString;
+        countdownDisplay.textContent = timeString;
+      }
+
+      function startCountdown(seconds) {
+        currentCountdown = seconds;
+        countdownDisplay.style.display = "block";
+
+        if (countdownInterval) clearInterval(countdownInterval);
+
+        countdownInterval = setInterval(() => {
+          if (currentCountdown > 0) {
+            currentCountdown--;
+            updateCountdown(currentCountdown);
+          } else {
+            clearInterval(countdownInterval);
+            countdownDisplay.style.display = "none";
+          }
+        }, 1000);
+
+        updateCountdown(currentCountdown);
+      }
+
+      async function startBulkTest() {
+        if (bulkTestInProgress) {
+          addLog("Bulk test is already in progress");
+          return;
+        }
+
+        if (selectedVideos.size === 0) {
+          addLog("Please select at least one video");
+          return;
+        }
+
+        bulkTestInProgress = true;
+        currentTestVideoIndex = 0;
+        testQueue = [];
+
+        testVideos.forEach((video) => {
+          if (selectedVideos.has(video.id)) {
+            testQueue.push({ ...video, status: "pending" });
+          }
+        });
+
+        addLog(`Starting bulk test with ${testQueue.length} videos`);
+        updateUI();
+        updateProgress();
+
+        processNextTestVideo();
+      }
+
+      async function processNextTestVideo() {
+        if (currentTestVideoIndex >= testQueue.length) {
+          completeBulkTest();
+          return;
+        }
+
+        const video = testQueue[currentTestVideoIndex];
+        video.status = "processing";
+        updateProgress();
+        addLog(`Processing video: ${video.title}`);
+
+        try {
+          const randomDelay = Math.floor(Math.random() * 240) + 60;
+          addLog(
+            `Random delay: ${Math.floor(randomDelay / 60)} min ${randomDelay % 60} sec`,
+          );
+
+          startCountdown(randomDelay);
+
+          await new Promise((resolve) => {
+            testTimer = setTimeout(() => {
+              resolve();
+            }, randomDelay * 1000);
+          });
+
+          video.status = "uploading";
+          updateProgress();
+          addLog(`Uploading video: ${video.title}`);
+
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+
+          video.status = "posting";
+          updateProgress();
+          addLog(`Posting video: ${video.title}`);
+
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+
+          video.status = "completed";
+          addLog(`Video posted successfully: ${video.title}`);
+
+          updateProgress();
+          currentTestVideoIndex++;
+
+          processNextTestVideo();
+        } catch (error) {
+          video.status = "failed";
+          addLog(`Error processing video ${video.title}: ${error.message}`);
+          updateProgress();
+          currentTestVideoIndex++;
+          processNextTestVideo();
+        }
+      }
+
+      function updateProgress() {
+        const completed = testQueue.filter(
+          (v) => v.status === "completed" || v.status === "failed",
+        ).length;
+        const total = testQueue.length;
+        progressText.textContent = `${completed}/${total}`;
+      }
+
+      function completeBulkTest() {
+        if (testTimer) clearTimeout(testTimer);
+        if (countdownInterval) clearInterval(countdownInterval);
+
+        bulkTestInProgress = false;
+        countdownDisplay.style.display = "none";
+
+        const completed = testQueue.filter(
+          (v) => v.status === "completed",
+        ).length;
+        const failed = testQueue.filter((v) => v.status === "failed").length;
+
+        addLog(
+          `Bulk test completed: ${completed} successful, ${failed} failed`,
+        );
+        updateUI();
+
+        selectedVideos.clear();
+        renderVideoGrid();
+        updateUI();
+      }
+
+      function cancelBulkTest() {
+        if (testTimer) clearTimeout(testTimer);
+        if (countdownInterval) clearInterval(countdownInterval);
+
+        bulkTestInProgress = false;
+        countdownDisplay.style.display = "none";
+
+        addLog("Bulk test cancelled");
+        updateUI();
+      }
+
+      selectAllBtn.addEventListener("click", () => {
+        selectedVideos.clear();
+        testVideos.forEach((video) => selectedVideos.add(video.id));
+        renderVideoGrid();
+        updateUI();
+        addLog("All videos selected");
+      });
+
+      clearSelectionBtn.addEventListener("click", () => {
+        selectedVideos.clear();
+        renderVideoGrid();
+        updateUI();
+        addLog("Selection cleared");
+      });
+
+      startBulkTestBtn.addEventListener("click", startBulkTest);
+      cancelBulkTestBtn.addEventListener("click", cancelBulkTest);
+
+      document.addEventListener("DOMContentLoaded", init);
+    </script>
+  </body>
+</html>

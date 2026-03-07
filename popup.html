@@ -50,16 +50,39 @@
       <div class="main-content">
         <div class="tab-header">
           <h2>My Video Library</h2>
-          <div class="controls">
-            <button id="refreshVideos" class="btn-icon" title="Refresh">
-              <i class="fas fa-sync-alt"></i>
-            </button>
-            <select id="accountFilter" class="filter-select">
-              <option value="all">All Accounts</option>
-              <!-- TikTok accounts will be loaded here -->
-            </select>
-            <div class="status-indicator">
-              <span class="status-badge ready">Ready to Post</span>
+          <div class="controls-container">
+            <div class="controls-row">
+              <div
+                class="bulk-controls"
+                id="bulkControls"
+                style="display: none"
+              >
+                <label class="select-all-label">
+                  <input type="checkbox" id="selectAllVideos" /> Select All
+                </label>
+                <button id="startBulkPost" class="btn-bulk">
+                  <i class="fas fa-play"></i> Start Bulk Post
+                </button>
+                <button
+                  id="stopBulkPost"
+                  class="btn-bulk btn-stop"
+                  style="display: none"
+                >
+                  <i class="fas fa-stop"></i> Stop
+                </button>
+              </div>
+            </div>
+            <div class="controls-row">
+              <button id="refreshVideos" class="btn-icon" title="Refresh">
+                <i class="fas fa-sync-alt"></i>
+              </button>
+              <select id="accountFilter" class="filter-select">
+                <option value="all">All Accounts</option>
+                <!-- TikTok accounts will be loaded here -->
+              </select>
+              <div class="status-indicator">
+                <span class="status-badge ready">Ready to Post</span>
+              </div>
             </div>
           </div>
         </div>

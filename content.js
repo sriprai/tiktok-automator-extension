@@ -148,6 +148,193 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   sendResponse({ success: false, error: "Unknown action" });
 });
 
+// Bulk processing logic for TikTok Studio
+async function handleTikTokBulkProcessing() {
+  const result = await chrome.storage.local.get([
+    "isBulkProcessing",
+    "bulkQueue",
+    "currentBulkIndex",
+  ]);
+  if (!result.isBulkProcessing || !result.bulkQueue) return;
+
+  const currentIndex = result.currentBulkIndex || 0;
+  const currentVideo = result.bulkQueue[currentIndex];
+
+  if (!currentVideo) {
+    console.log("No video found in queue for index:", currentIndex);
+    return;
+  }
+
+  // Create process detection UI
+  const statusOverlay = document.createElement("div");
+  statusOverlay.id = "bulk-status-overlay";
+  statusOverlay.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.85);
+    color: white;
+    padding: 20px;
+    border-radius: 12px;
+    z-index: 10000;
+    font-family: sans-serif;
+    border: 1px solid #fe2c55;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    min-width: 250px;
+  `;
+  statusOverlay.innerHTML = `
+    <h3 style="margin: 0 0 10px 0; color: #fe2c55; font-size: 16px;">Bulk Posting Active</h3>
+    <div style="font-size: 14px; margin-bottom: 8px;">Video: ${currentIndex + 1} / ${result.bulkQueue.length}</div>
+    <div id="bulk-step-text" style="font-size: 12px; color: #ccc;">Initializing...</div>
+    <div style="margin-top: 10px; height: 6px; background: #333; border-radius: 3px; overflow: hidden;">
+      <div style="width: ${((currentIndex + 1) / result.bulkQueue.length) * 100}%; height: 100%; background: #fe2c55;"></div>
+    </div>
+  `;
+  document.body.appendChild(statusOverlay);
+
+  const updateStep = (text) => {
+    const el = document.getElementById("bulk-step-text");
+    if (el) el.textContent = text;
+    console.log(`Bulk Step: ${text}`);
+  };
+
+  updateStep("Waiting for page load...");
+  await waitForPageLoad();
+
+  updateStep("Uploading video...");
+  const uploadResult = await uploadVideo(currentVideo.video_url);
+  if (!uploadResult.success) {
+    updateStep("Upload failed: " + uploadResult.error);
+    return;
+  }
+
+  updateStep("Processing video...");
+  await new Promise((resolve) => setTimeout(resolve, 5000));
+
+  updateStep("Setting caption...");
+  await setCaption(currentVideo.caption);
+
+  if (
+    currentVideo.product_id &&
+    currentVideo.product_id.trim() !== "" &&
+    currentVideo.product_id !== "manual" &&
+    currentVideo.product_id !== "none"
+  ) {
+    updateStep("Adding product...");
+    await addProduct(currentVideo.product_id);
+  }
+
+  updateStep("Enabling AI content...");
+  await toggleAIContent();
+
+  updateStep("Waiting for Post button...");
+
+  const checkPostButton = async () => {
+    const postButton = document.querySelector(
+      'button[data-e2e="post_video_button"]',
+    );
+    if (postButton) {
+      const isDisabled =
+        postButton.disabled ||
+        postButton.getAttribute("aria-disabled") === "true" ||
+        postButton.getAttribute("data-disabled") === "true" ||
+        postButton.classList.contains("Button--disabled");
+
+      if (!isDisabled) {
+        updateStep("Clicking Post button...");
+        postButton.click();
+
+        setTimeout(async () => {
+          const modalConfirm = document.querySelector(
+            ".common-modal-confirm-modal",
+          );
+          if (modalConfirm) {
+            const confirmButtons = Array.from(
+              modalConfirm.querySelectorAll("button"),
+            );
+            const postNowBtn = confirmButtons.find((btn) =>
+              btn.textContent.toLowerCase().includes("post now"),
+            );
+            if (postNowBtn) {
+              updateStep("Confirming post...");
+              postNowBtn.click();
+            }
+          }
+
+          updateStep("Updating status to database...");
+          try {
+            const webhookUrl =
+              "https://n8n.srv803794.hstgr.cloud/webhook/df76bbf9-ed7e-4f95-a62e-2495fe836c63";
+            const payload = {
+              taskId: currentVideo.id,
+              status: "Posted to Tiktok",
+              timestamp: new Date().toISOString(),
+              url: window.location.href,
+              detectionMethod: "bulk_auto_post",
+            };
+
+            await chrome.runtime.sendMessage({
+              action: "FETCH_API",
+              url: webhookUrl,
+              options: {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              },
+            });
+          } catch (e) {
+            console.error("Webhook failed", e);
+          }
+
+          const randomDelay =
+            Math.floor(Math.random() * (300000 - 60000 + 1)) + 60000;
+          const nextStartTime = Date.now() + randomDelay;
+
+          const countdownInterval = setInterval(() => {
+            const remaining = Math.round((nextStartTime - Date.now()) / 1000);
+            if (remaining > 0) {
+              updateStep(`Next video in ${remaining}s (Random Delay)`);
+            } else {
+              clearInterval(countdownInterval);
+            }
+          }, 1000);
+
+          setTimeout(async () => {
+            const storage = await chrome.storage.local.get([
+              "currentBulkIndex",
+              "bulkQueue",
+            ]);
+            const nextIndex = (storage.currentBulkIndex || 0) + 1;
+            await chrome.storage.local.set({ currentBulkIndex: nextIndex });
+
+            if (nextIndex < storage.bulkQueue.length) {
+              window.location.href =
+                "https://www.tiktok.com/tiktokstudio/upload";
+            } else {
+              await chrome.storage.local.set({ isBulkProcessing: false });
+              alert("Bulk Posting Completed!");
+              window.location.href = "https://www.automatorx.co/dashboard";
+            }
+          }, randomDelay);
+        }, 2000);
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const pollInterval = setInterval(async () => {
+    if (await checkPostButton()) {
+      clearInterval(pollInterval);
+    }
+  }, 2000);
+}
+
+// Run bulk processing check on TikTok Studio upload page
+if (window.location.href.includes("tiktok.com/tiktokstudio/upload")) {
+  handleTikTokBulkProcessing();
+}
+
 // Handle video upload automation
 async function handleVideoUpload(data, sendResponse) {
   try {
@@ -421,7 +608,7 @@ async function waitForPageLoad() {
   });
 }
 
-async function waitForElement(selector, timeout = 10000) {
+async function waitForElement(selector, timeout = 30000) {
   return new Promise((resolve, reject) => {
     const startTime = Date.now();
 
@@ -437,7 +624,7 @@ async function waitForElement(selector, timeout = 10000) {
         return;
       }
 
-      setTimeout(checkElement, 100);
+      setTimeout(checkElement, 500);
     };
 
     checkElement();

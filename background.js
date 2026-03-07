@@ -80,6 +80,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // Keep message channel open for async response
   }
 
+  // Handle OPEN_UPLOAD_PAGE request from webapp-content.js
+  if (message.action === "OPEN_UPLOAD_PAGE") {
+    handleOpenUploadPage(message.data, sendResponse);
+    return true;
+  }
+
   // Default response for unknown actions
   sendResponse({
     success: false,
@@ -87,6 +93,39 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     receivedAction: message.action,
   });
 });
+
+async function handleOpenUploadPage(data, sendResponse) {
+  try {
+    const tab = await chrome.tabs.create({
+      url: "https://www.tiktok.com/tiktokstudio/upload",
+      active: true,
+    });
+
+    // Wait for tab to load
+    chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
+      if (tabId === tab.id && info.status === "complete") {
+        chrome.tabs.onUpdated.removeListener(listener);
+
+        // Send data to content script
+        setTimeout(() => {
+          chrome.tabs.sendMessage(tab.id, {
+            action: "UPLOAD_VIDEO",
+            data: {
+              taskId: data.id,
+              videoUrl: data.video_url,
+              caption: data.caption,
+              productId: data.product_id,
+            },
+          });
+        }, 2000);
+      }
+    });
+
+    sendResponse({ success: true });
+  } catch (error) {
+    sendResponse({ success: false, error: error.message });
+  }
+}
 
 // Handle video posting to TikTok
 async function handlePostVideo(data, sendResponse) {
@@ -105,7 +144,7 @@ async function handlePostVideo(data, sendResponse) {
     // Open TikTok upload page (regular upload page)
     // Note: We use the base URL without query parameters
     const tab = await chrome.tabs.create({
-      url: "https://www.tiktok.com/upload",
+      url: "https://www.tiktok.com/tiktokstudio/upload",
       active: true,
     });
 
