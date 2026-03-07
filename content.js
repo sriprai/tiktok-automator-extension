@@ -282,7 +282,9 @@ async function handleTikTokBulkProcessing() {
               "https://n8n.srv803794.hstgr.cloud/webhook/df76bbf9-ed7e-4f95-a62e-2495fe836c63";
             const payload = {
               taskId: currentVideo.id,
-              status: "Posted to Tiktok",
+              status: currentVideo.is_schedule
+                ? "Scheduled to Tiktok"
+                : "Posted to Tiktok",
               timestamp: new Date().toISOString(),
               url: window.location.href,
               detectionMethod: "bulk_auto_post",
