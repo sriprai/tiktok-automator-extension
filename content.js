@@ -651,7 +651,20 @@ async function uploadVideo(videoUrl) {
     console.log("Uploading video from URL:", videoUrl);
 
     // Find file input
-    const fileInput = await waitForElement('input[type="file"]');
+    // TikTok Studio uses a hidden file input, sometimes it takes time to appear
+    // or is inside an iframe. We try to find it with a longer timeout and more specific check.
+    let fileInput = document.querySelector('input[type="file"]');
+
+    if (!fileInput) {
+      console.log("File input not found immediately, waiting...");
+      try {
+        fileInput = await waitForElement('input[type="file"]', 30000);
+      } catch (e) {
+        // Fallback: try to find any file input in the page
+        fileInput = document.querySelector('input[type="file"]');
+      }
+    }
+
     if (!fileInput) {
       return { success: false, error: "Could not find file upload input" };
     }
